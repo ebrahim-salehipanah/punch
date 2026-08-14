@@ -225,7 +225,7 @@
       <span class="dot" id="statusDot"></span>
       <span id="statusText">camera off</span>
       <span class="face-status" id="faceStatus">👤 detecting...</span>
-      <span class="reaction-display" id="reactionDisplay">⏱️ best: --ms</span>
+      <span class="reaction-display" id="reactionDisplay">⏱️ last: --ms</span>
     </div>
     <div class="mode-selector" id="modeSelector">
       <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
@@ -274,8 +274,8 @@
     // counters
     let punches = 0;
     let safe = 0;
-    let bestReaction = Infinity;
     let lastReactionTime = 0;
+    let hasValidReaction = false;
 
     // glove
     let gloveX = 0.5, gloveY = 0.5;
@@ -490,7 +490,7 @@
       
       ctx.shadowBlur = 0;
 
-      // Draw face center indicator (for debugging - shows where punch detection is)
+      // Draw face detection area (for debugging)
       const centerX = faceCenterX * w;
       const centerY = faceCenterY * h;
       const radius = faceRadius * Math.min(w, h);
@@ -622,15 +622,18 @@
           gloveVisible = !gloveVisible;
           
           if (gloveVisible) {
+            // Glove appears - start measuring reaction time
             isMeasuringReaction = true;
             reactionStartTime = performance.now();
             
+            // Increase speed gradually
             if (blinkInterval > MIN_INTERVAL) {
               blinkInterval = Math.max(MIN_INTERVAL, blinkInterval - 0.5);
               blinkLevel = Math.floor((MAX_INTERVAL - blinkInterval) / 3) + 1;
               speedLevel.textContent = `level ${Math.min(blinkLevel, 15)}`;
             }
             
+            // Random position
             gloveX = 0.15 + Math.random() * 0.7;
             gloveY = 0.15 + Math.random() * 0.7;
             const a = Math.random() * 2 * Math.PI;
@@ -639,26 +642,26 @@
             const l = Math.hypot(dirX, dirY);
             if (l > 0) { dirX /= l; dirY /= l; }
           } else {
+            // Glove disappears - stop measuring reaction (no punch recorded)
             isMeasuringReaction = false;
           }
           
           blinkTimer = Math.floor(blinkInterval);
         }
 
-        // Check collision with face
+        // Check collision with face - ONLY when glove is visible
         if (gloveVisible && dist < threshold) {
           if (hitCooldown <= 0) {
             punches++;
             punchCountEl.textContent = punches;
             hitCooldown = COOLDOWN_FRAMES;
             
+            // ONLY record reaction time if we're actively measuring (glove just appeared)
             if (isMeasuringReaction) {
               const reactionTime = performance.now() - reactionStartTime;
               lastReactionTime = reactionTime;
-              if (reactionTime < bestReaction) {
-                bestReaction = reactionTime;
-                reactionDisplay.textContent = `⏱️ best: ${Math.round(bestReaction)}ms`;
-              }
+              hasValidReaction = true;
+              reactionDisplay.textContent = `⏱️ last: ${Math.round(reactionTime)}ms`;
               isMeasuringReaction = false;
             }
             
@@ -760,7 +763,7 @@
         ctx.fillText('✓ face tracked', 16, h - 16);
       }
 
-      if (currentMode === 'blink' && lastReactionTime > 0) {
+      if (currentMode === 'blink' && hasValidReaction && lastReactionTime > 0) {
         ctx.font = 'bold 18px system-ui';
         ctx.fillStyle = 'rgba(255, 216, 102, 0.8)';
         ctx.textAlign = 'center';
@@ -813,9 +816,9 @@
       safe = 0;
       punchCountEl.textContent = '0';
       safeCountEl.textContent = '0';
-      bestReaction = Infinity;
-      reactionDisplay.textContent = '⏱️ best: --ms';
       lastReactionTime = 0;
+      hasValidReaction = false;
+      reactionDisplay.textContent = '⏱️ last: --ms';
     }
 
     function resetBlinkSpeed() {
