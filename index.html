@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Boxing trainer · face border</title>
+  <title>Boxing trainer · fast face</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -189,6 +189,14 @@
       border-radius: 30px;
       border: 1px solid #3d4f72;
     }
+    .fps-counter {
+      color: #6a7a92;
+      font-size: 0.75rem;
+      background: #141a28;
+      padding: 2px 10px;
+      border-radius: 20px;
+      border: 1px solid #2a3349;
+    }
     @media (max-width: 600px) {
       .card { padding: 16px; }
       h1 { font-size: 1.3rem; }
@@ -202,7 +210,7 @@
 <div class="card">
   <h1>
     🥊 BOXING TRAINER
-    <small>face border</small>
+    <small>fast face</small>
   </h1>
 
   <div class="video-wrapper">
@@ -215,6 +223,7 @@
       <span class="dot" id="statusDot"></span>
       <span id="statusText">camera off</span>
       <span class="face-status" id="faceStatus">👤 detecting...</span>
+      <span class="fps-counter" id="fpsCounter">⚡ 0 fps</span>
     </div>
     <div class="mode-selector" id="modeSelector">
       <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
@@ -246,6 +255,7 @@
     const modeStatus = document.getElementById('modeStatus');
     const punchCountEl = document.getElementById('punchCount');
     const safeCountEl = document.getElementById('safeCount');
+    const fpsCounter = document.getElementById('fpsCounter');
 
     const startBtn = document.getElementById('startBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -277,21 +287,22 @@
     let hitCooldown = 0;
     const COOLDOWN_FRAMES = 20;
 
-    // ----- Face detection (using MediaPipe FaceMesh via CDN) -----
-    let faceDetector = null;
+    // ----- Face detection using MediaPipe (optimized) -----
     let faceMesh = null;
     let faceLandmarks = null;
     let faceDetectionReady = false;
     let faceDetectionAttempted = false;
+    let frameCount = 0;
+    let lastFpsUpdate = 0;
+    let currentFps = 0;
 
-    // Load MediaPipe FaceMesh
     async function loadFaceDetection() {
       if (faceDetectionAttempted) return;
       faceDetectionAttempted = true;
+      
       try {
-        // Dynamically load MediaPipe libraries
+        // Load MediaPipe libraries
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
-        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
 
@@ -302,10 +313,11 @@
         faceMesh.setOptions({
           maxNumFaces: 1,
           refineLandmarks: true,
-          minDetectionConfidence: 0.5,
+          minDetectionConfidence: 0.6,
           minTrackingConfidence: 0.5
         });
 
+        // Process results directly - NO separate camera loop
         faceMesh.onResults((results) => {
           if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
             faceLandmarks = results.multiFaceLandmarks[0];
@@ -313,26 +325,34 @@
             faceStatus.style.color = '#8af';
           } else {
             faceLandmarks = null;
-            faceStatus.textContent = '👤 no face';
+            faceStatus.textContent = '👤 scanning...';
             faceStatus.style.color = '#a88';
           }
         });
 
-        // Start face detection
+        // Start face detection on the video stream
         const camera = new Camera(video, {
           onFrame: async () => {
-            if (faceMesh) {
-              await faceMesh.send({ image: video });
+            if (faceMesh && isCameraReady) {
+              try {
+                await faceMesh.send({ image: video });
+              } catch (e) {
+                // silent fail
+              }
             }
           },
           width: 640,
           height: 480
         });
+        
         await camera.start();
         faceDetectionReady = true;
-        console.log('Face detection ready');
+        console.log('✅ Face detection ready (fast mode)');
+        faceStatus.textContent = '👤 ready';
+        faceStatus.style.color = '#8af';
+        
       } catch (err) {
-        console.warn('Face detection not available:', err);
+        console.warn('Face detection unavailable:', err);
         faceStatus.textContent = '⚠️ face detection unavailable';
         faceDetectionReady = false;
       }
@@ -366,7 +386,16 @@
           stream.getTracks().forEach(t => t.stop());
           stream = null;
         }
-        const constraints = { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } };
+        
+        const constraints = { 
+          video: { 
+            facingMode: 'user', 
+            width: { ideal: 640 }, 
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          } 
+        };
+        
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         await video.play();
@@ -375,12 +404,13 @@
         statusText.innerText = 'camera on';
         resizeCanvas();
 
-        // Load face detection after camera is ready
+        // Load face detection AFTER camera is ready (faster startup)
         if (!faceDetectionAttempted) {
           await loadFaceDetection();
         }
 
         if (!animationFrame) loop();
+        
       } catch (err) {
         console.warn('camera error', err);
         isCameraReady = false;
@@ -390,12 +420,13 @@
       }
     }
 
-    // ----- draw face border (from landmarks) -----
+    // ----- draw face border (mirrored correctly) -----
     function drawFaceBorder() {
       if (!faceLandmarks || !faceDetectionReady) return;
 
       const w = canvas.width, h = canvas.height;
-      // Get key points: outline of face (indices 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109)
+      
+      // Face outline indices (mirrored to match video)
       const indices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
       
       ctx.beginPath();
@@ -403,7 +434,8 @@
       for (const idx of indices) {
         const lm = faceLandmarks[idx];
         if (!lm) continue;
-        const x = lm.x * w;
+        // Mirror X coordinate to match video flip
+        const x = (1 - lm.x) * w;
         const y = lm.y * h;
         if (first) {
           ctx.moveTo(x, y);
@@ -420,18 +452,19 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Draw additional key points (eyes, nose, mouth) for better visualization
+      // Draw key facial features (mirrored)
       const features = [
-        { idx: 1, color: '#ffaa55', label: '👁' },  // right eye
-        { idx: 33, color: '#ffaa55', label: '👁' }, // left eye
-        { idx: 0, color: '#ff6b6b', label: '👃' },  // nose
-        { idx: 13, color: '#ff6b6b', label: '👄' }, // mouth
-        { idx: 14, color: '#ff6b6b', label: '👄' }  // mouth
+        { idx: 1, color: '#ffaa55', label: '👁' },   // right eye (mirrored)
+        { idx: 33, color: '#ffaa55', label: '👁' },  // left eye (mirrored)
+        { idx: 0, color: '#ff6b6b', label: '👃' },   // nose
+        { idx: 13, color: '#ff6b6b', label: '👄' },  // mouth
+        { idx: 14, color: '#ff6b6b', label: '👄' }   // mouth
       ];
+      
       for (const f of features) {
         const lm = faceLandmarks[f.idx];
         if (!lm) continue;
-        const x = lm.x * w;
+        const x = (1 - lm.x) * w;
         const y = lm.y * h;
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, 2 * Math.PI);
@@ -446,6 +479,27 @@
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.fillText(f.label, x + 12, y - 8);
         ctx.shadowBlur = 0;
+      }
+
+      // Draw face bounding box (for extra clarity)
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const idx of indices) {
+        const lm = faceLandmarks[idx];
+        if (!lm) continue;
+        const x = (1 - lm.x) * w;
+        const y = lm.y * h;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+      
+      if (minX !== Infinity) {
+        ctx.strokeStyle = 'rgba(0, 255, 200, 0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 8]);
+        ctx.strokeRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
+        ctx.setLineDash([]);
       }
     }
 
@@ -619,12 +673,22 @@
       if (hitCooldown > 0) hitCooldown--;
     }
 
-    // ----- render loop -----
+    // ----- render loop (optimized) -----
     function loop() {
       if (!isCameraReady) {
         drawOverlay();
         animationFrame = requestAnimationFrame(loop);
         return;
+      }
+
+      // FPS counter
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsUpdate > 1000) {
+        currentFps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
+        fpsCounter.textContent = `⚡ ${currentFps} fps`;
+        frameCount = 0;
+        lastFpsUpdate = now;
       }
 
       updateGame();
@@ -636,7 +700,7 @@
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Draw face border FIRST (behind everything)
+      // Draw face border FIRST (fast, uses cached landmarks)
       drawFaceBorder();
 
       drawUser();
@@ -650,6 +714,15 @@
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
       ctx.fillText(currentMode.toUpperCase(), w - 20, 16);
+      
+      // Show face detection status on canvas
+      if (faceLandmarks) {
+        ctx.font = '14px system-ui';
+        ctx.fillStyle = 'rgba(0, 255, 200, 0.3)';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('✓ face tracked', 16, h - 16);
+      }
     }
 
     // ----- controls -----
