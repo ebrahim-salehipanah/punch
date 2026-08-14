@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Boxing trainer · reaction time</title>
+  <title>Boxing trainer · face punch</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -212,7 +212,7 @@
 <div class="card">
   <h1>
     🥊 BOXING TRAINER
-    <small>reaction time</small>
+    <small>face punch</small>
   </h1>
 
   <div class="video-wrapper">
@@ -298,6 +298,11 @@
     let hitCooldown = 0;
     const COOLDOWN_FRAMES = 20;
 
+    // Face position tracking
+    let faceCenterX = 0.5;
+    let faceCenterY = 0.5;
+    let faceRadius = 0.1;
+
     // ----- Face detection -----
     let faceMesh = null;
     let faceLandmarks = null;
@@ -327,6 +332,29 @@
         faceMesh.onResults((results) => {
           if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
             faceLandmarks = results.multiFaceLandmarks[0];
+            
+            // Calculate face center from landmarks
+            let sumX = 0, sumY = 0, count = 0;
+            for (const lm of faceLandmarks) {
+              sumX += lm.x;
+              sumY += lm.y;
+              count++;
+            }
+            if (count > 0) {
+              // Mirror X to match video
+              faceCenterX = 1 - (sumX / count);
+              faceCenterY = sumY / count;
+              
+              // Calculate face radius (approximate from nose to face edge)
+              const nose = faceLandmarks[1];
+              const cheek = faceLandmarks[234];
+              if (nose && cheek) {
+                const dx = (1 - nose.x) - (1 - cheek.x);
+                const dy = nose.y - cheek.y;
+                faceRadius = Math.hypot(dx, dy) * 1.2;
+              }
+            }
+            
             faceStatus.textContent = '👤 face detected';
             faceStatus.style.color = '#8af';
           } else {
@@ -427,8 +455,6 @@
 
       const w = canvas.width, h = canvas.height;
       
-      // Complete face outline indices (468 landmarks total, using the full face contour)
-      // These indices trace the entire face boundary
       const faceOutline = [
         10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 
         400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 
@@ -451,20 +477,31 @@
       }
       ctx.closePath();
       
-      // Glowing border effect
       ctx.shadowColor = '#00ffcc';
       ctx.shadowBlur = 25;
       ctx.strokeStyle = '#00ffcc';
       ctx.lineWidth = 4;
       ctx.stroke();
       
-      // Secondary glow layer
       ctx.shadowBlur = 40;
       ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
       ctx.lineWidth = 8;
       ctx.stroke();
       
       ctx.shadowBlur = 0;
+
+      // Draw face center indicator (for debugging - shows where punch detection is)
+      const centerX = faceCenterX * w;
+      const centerY = faceCenterY * h;
+      const radius = faceRadius * Math.min(w, h);
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // ----- draw boxing glove -----
@@ -520,10 +557,20 @@
       ctx.shadowBlur = 0;
     }
 
-    // ----- draw user indicator -----
+    // ----- draw user indicator (face position) -----
     function drawUser() {
       const w = canvas.width, h = canvas.height;
-      const cx = w * 0.5, cy = h * 0.5;
+      
+      // Use face position if available, otherwise center
+      let cx, cy;
+      if (faceLandmarks && faceDetectionReady) {
+        cx = faceCenterX * w;
+        cy = faceCenterY * h;
+      } else {
+        cx = w * 0.5;
+        cy = h * 0.5;
+      }
+      
       const r = Math.min(w, h) * 0.085;
 
       ctx.beginPath();
@@ -550,11 +597,23 @@
     function updateGame() {
       if (!gameActive || !isCameraReady) return;
 
-      const userX = 0.5, userY = 0.5;
+      // Get user position (face center or fallback to center)
+      let userX, userY;
+      if (faceLandmarks && faceDetectionReady) {
+        userX = faceCenterX;
+        userY = faceCenterY;
+      } else {
+        userX = 0.5;
+        userY = 0.5;
+      }
+
       const dx = gloveX - userX;
       const dy = gloveY - userY;
       const dist = Math.hypot(dx, dy);
-      const threshold = GLOVE_RADIUS + 0.085;
+      
+      // Use face radius for collision detection
+      const userRadius = Math.max(faceRadius, 0.085);
+      const threshold = GLOVE_RADIUS + userRadius;
 
       if (currentMode === 'blink') {
         blinkTimer--;
@@ -563,18 +622,15 @@
           gloveVisible = !gloveVisible;
           
           if (gloveVisible) {
-            // Glove appears - start measuring reaction time
             isMeasuringReaction = true;
             reactionStartTime = performance.now();
             
-            // Increase speed gradually
             if (blinkInterval > MIN_INTERVAL) {
               blinkInterval = Math.max(MIN_INTERVAL, blinkInterval - 0.5);
               blinkLevel = Math.floor((MAX_INTERVAL - blinkInterval) / 3) + 1;
               speedLevel.textContent = `level ${Math.min(blinkLevel, 15)}`;
             }
             
-            // Random position
             gloveX = 0.15 + Math.random() * 0.7;
             gloveY = 0.15 + Math.random() * 0.7;
             const a = Math.random() * 2 * Math.PI;
@@ -583,21 +639,19 @@
             const l = Math.hypot(dirX, dirY);
             if (l > 0) { dirX /= l; dirY /= l; }
           } else {
-            // Glove disappears - stop measuring
             isMeasuringReaction = false;
           }
           
           blinkTimer = Math.floor(blinkInterval);
         }
 
-        // Check collision when glove is visible
+        // Check collision with face
         if (gloveVisible && dist < threshold) {
           if (hitCooldown <= 0) {
             punches++;
             punchCountEl.textContent = punches;
             hitCooldown = COOLDOWN_FRAMES;
             
-            // Measure reaction time (time from appearance to hit)
             if (isMeasuringReaction) {
               const reactionTime = performance.now() - reactionStartTime;
               lastReactionTime = reactionTime;
@@ -685,9 +739,7 @@
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Draw face border (complete face outline only)
       drawFaceBorder();
-
       drawUser();
 
       const isHit = hitCooldown > 0;
@@ -708,7 +760,6 @@
         ctx.fillText('✓ face tracked', 16, h - 16);
       }
 
-      // Show last reaction time in blink mode
       if (currentMode === 'blink' && lastReactionTime > 0) {
         ctx.font = 'bold 18px system-ui';
         ctx.fillStyle = 'rgba(255, 216, 102, 0.8)';
