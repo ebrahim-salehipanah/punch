@@ -1,902 +1,1160 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Boxing trainer · face punch</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0b0d15;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-      padding: 16px;
-    }
-    .card {
-      background: #1a1e2b;
-      border-radius: 40px;
-      padding: 24px 24px 28px;
-      max-width: 920px;
-      width: 100%;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-      border: 1px solid #3d4459;
-    }
-    h1 {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 500;
-      font-size: 1.8rem;
-      letter-spacing: -0.3px;
-      color: #eef2ff;
-      margin-bottom: 12px;
-      padding-left: 6px;
-      flex-wrap: wrap;
-    }
-    h1 small {
-      font-size: 0.85rem;
-      background: #2f3a4f;
-      padding: 0 16px;
-      border-radius: 60px;
-      font-weight: 400;
-      color: #b3c7ff;
-    }
-    .video-wrapper {
-      position: relative;
-      background: #10131f;
-      border-radius: 28px;
-      overflow: hidden;
-      box-shadow: inset 0 0 0 1px #313a4e, 0 12px 28px rgba(0,0,0,0.5);
-      aspect-ratio: 4 / 3;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      transform: scaleX(-1);
-      background: #0e121f;
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      pointer-events: none;
-    }
-    .controls {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px 10px;
-    }
-    .status-badge {
-      background: #242b3d;
-      padding: 6px 18px;
-      border-radius: 60px;
-      color: #cbd5f0;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border: 1px solid #3b445c;
-      flex-wrap: wrap;
-    }
-    .dot {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 12px;
-      background: #53c47b;
-      transition: 0.2s;
-    }
-    .dot.inactive { background: #b34a5e; }
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      background: #2a3349;
-      border: none;
-      border-radius: 60px;
-      padding: 8px 20px;
-      font-weight: 500;
-      font-size: 0.95rem;
-      color: #eef2ff;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: 0.15s;
-      border: 1px solid #414b66;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }
-    .btn:active { transform: scale(0.94); }
-    .btn-primary {
-      background: #4f6bf5;
-      border-color: #7b93ff;
-      color: white;
-      box-shadow: 0 4px 12px #2f48b0;
-    }
-    .btn-primary:hover { background: #3f5be0; }
-    .btn-secondary { background: #303a52; }
-    .btn-secondary:hover { background: #3d4a66; }
-    .mode-selector {
-      display: flex;
-      gap: 6px;
-      background: #1b2131;
-      padding: 4px;
-      border-radius: 60px;
-      border: 1px solid #2e374d;
-    }
-    .mode-btn {
-      background: transparent;
-      border: none;
-      padding: 6px 16px;
-      border-radius: 60px;
-      color: #9baec9;
-      font-weight: 500;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: 0.15s;
-    }
-    .mode-btn.active {
-      background: #3f4b6b;
-      color: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    }
-    .mode-btn:hover:not(.active) { background: #2f3a54; }
-    .stats {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      margin-top: 16px;
-      padding: 0 4px;
-      color: #9baec9;
-      font-size: 0.9rem;
-      gap: 8px 12px;
-    }
-    .stats span {
-      background: #1b2131;
-      padding: 6px 18px;
-      border-radius: 40px;
-      border: 1px solid #2e374d;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .stat-value {
-      color: #d6e2ff;
-      font-weight: 600;
-      min-width: 24px;
-    }
-    .face-status {
-      color: #8af;
-      font-size: 0.8rem;
-      background: #1a2335;
-      padding: 2px 12px;
-      border-radius: 30px;
-      border: 1px solid #3d4f72;
-    }
-    .reaction-display {
-      color: #ffd866;
-      font-weight: 600;
-      font-size: 0.85rem;
-      background: #1a2335;
-      padding: 2px 12px;
-      border-radius: 30px;
-      border: 1px solid #3d4f72;
-    }
-    @media (max-width: 600px) {
-      .card { padding: 16px; }
-      h1 { font-size: 1.3rem; }
-      .controls { flex-direction: column; align-items: stretch; }
-      .btn-group { justify-content: center; }
-      .mode-selector { justify-content: center; }
-    }
-  </style>
-</head>
-<body>
-<div class="card">
-  <h1>
-    🥊 BOXING TRAINER
-    <small>face punch</small>
-  </h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Boxing trainer · face punch</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #0b0d15;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+        padding: 16px;
+        transition: all 0.3s;
+      }
+      body.fullscreen-mode {
+        padding: 0;
+        background: #000;
+      }
+      .card {
+        background: #1a1e2b;
+        border-radius: 40px;
+        padding: 24px 24px 28px;
+        max-width: 920px;
+        width: 100%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+        border: 1px solid #3d4459;
+        transition: all 0.3s;
+      }
+      body.fullscreen-mode .card {
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        padding: 12px;
+        border: none;
+        box-shadow: none;
+        background: #0a0c14;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      h1 {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 500;
+        font-size: 1.8rem;
+        letter-spacing: -0.3px;
+        color: #eef2ff;
+        margin-bottom: 12px;
+        padding-left: 6px;
+        flex-wrap: wrap;
+      }
+      body.fullscreen-mode h1 {
+        font-size: 1.2rem;
+        margin-bottom: 6px;
+        padding-left: 4px;
+      }
+      h1 small {
+        font-size: 0.85rem;
+        background: #2f3a4f;
+        padding: 0 16px;
+        border-radius: 60px;
+        font-weight: 400;
+        color: #b3c7ff;
+      }
+      body.fullscreen-mode h1 small {
+        font-size: 0.7rem;
+        padding: 0 10px;
+      }
+      .video-wrapper {
+        position: relative;
+        background: #10131f;
+        border-radius: 28px;
+        overflow: hidden;
+        box-shadow:
+          inset 0 0 0 1px #313a4e,
+          0 12px 28px rgba(0, 0, 0, 0.5);
+        aspect-ratio: 4 / 3;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      body.fullscreen-mode .video-wrapper {
+        border-radius: 16px;
+        flex: 1;
+        aspect-ratio: auto;
+        max-height: calc(100vh - 140px);
+      }
+      #video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transform: scaleX(-1);
+        background: #0e121f;
+      }
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        pointer-events: none;
+      }
+      .controls {
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px 10px;
+      }
+      body.fullscreen-mode .controls {
+        margin-top: 8px;
+        gap: 8px;
+      }
+      .status-badge {
+        background: #242b3d;
+        padding: 6px 18px;
+        border-radius: 60px;
+        color: #cbd5f0;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid #3b445c;
+        flex-wrap: wrap;
+      }
+      body.fullscreen-mode .status-badge {
+        padding: 4px 12px;
+        font-size: 0.75rem;
+        gap: 6px;
+      }
+      .dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 12px;
+        background: #53c47b;
+        transition: 0.2s;
+      }
+      .dot.inactive {
+        background: #b34a5e;
+      }
+      .btn-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      body.fullscreen-mode .btn-group {
+        gap: 6px;
+      }
+      .btn {
+        background: #2a3349;
+        border: none;
+        border-radius: 60px;
+        padding: 8px 20px;
+        font-weight: 500;
+        font-size: 0.95rem;
+        color: #eef2ff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: 0.15s;
+        border: 1px solid #414b66;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      body.fullscreen-mode .btn {
+        padding: 5px 14px;
+        font-size: 0.8rem;
+      }
+      .btn:active {
+        transform: scale(0.94);
+      }
+      .btn-primary {
+        background: #4f6bf5;
+        border-color: #7b93ff;
+        color: white;
+        box-shadow: 0 4px 12px #2f48b0;
+      }
+      .btn-primary:hover {
+        background: #3f5be0;
+      }
+      .btn-secondary {
+        background: #303a52;
+      }
+      .btn-secondary:hover {
+        background: #3d4a66;
+      }
+      .btn-fullscreen {
+        background: #2a3349;
+        border-color: #414b66;
+      }
+      .btn-fullscreen:hover {
+        background: #3d4a66;
+      }
+      .mode-selector {
+        display: flex;
+        gap: 6px;
+        background: #1b2131;
+        padding: 4px;
+        border-radius: 60px;
+        border: 1px solid #2e374d;
+      }
+      body.fullscreen-mode .mode-selector {
+        padding: 3px;
+        gap: 4px;
+      }
+      .mode-btn {
+        background: transparent;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 60px;
+        color: #9baec9;
+        font-weight: 500;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      body.fullscreen-mode .mode-btn {
+        padding: 4px 12px;
+        font-size: 0.75rem;
+      }
+      .mode-btn.active {
+        background: #3f4b6b;
+        color: white;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      }
+      .mode-btn:hover:not(.active) {
+        background: #2f3a54;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        margin-top: 16px;
+        padding: 0 4px;
+        color: #9baec9;
+        font-size: 0.9rem;
+        gap: 8px 12px;
+      }
+      body.fullscreen-mode .stats {
+        margin-top: 6px;
+        font-size: 0.75rem;
+        gap: 4px 8px;
+      }
+      .stats span {
+        background: #1b2131;
+        padding: 6px 18px;
+        border-radius: 40px;
+        border: 1px solid #2e374d;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      body.fullscreen-mode .stats span {
+        padding: 3px 10px;
+        font-size: 0.7rem;
+      }
+      .stat-value {
+        color: #d6e2ff;
+        font-weight: 600;
+        min-width: 24px;
+      }
+      .face-status {
+        color: #8af;
+        font-size: 0.8rem;
+        background: #1a2335;
+        padding: 2px 12px;
+        border-radius: 30px;
+        border: 1px solid #3d4f72;
+      }
+      body.fullscreen-mode .face-status {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+      }
+      .reaction-display {
+        color: #ffd866;
+        font-weight: 600;
+        font-size: 0.85rem;
+        background: #1a2335;
+        padding: 2px 12px;
+        border-radius: 30px;
+        border: 1px solid #3d4f72;
+      }
+      body.fullscreen-mode .reaction-display {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+      }
+      @media (max-width: 600px) {
+        .card {
+          padding: 16px;
+        }
+        h1 {
+          font-size: 1.3rem;
+        }
+        .controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .btn-group {
+          justify-content: center;
+        }
+        .mode-selector {
+          justify-content: center;
+        }
+        body.fullscreen-mode .controls {
+          flex-direction: row;
+          flex-wrap: wrap;
+        }
+        body.fullscreen-mode .btn-group {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="appCard">
+      <h1>
+        🥊 BOXING TRAINER
+        <small>face punch</small>
+      </h1>
 
-  <div class="video-wrapper">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="overlayCanvas"></canvas>
-  </div>
+      <div class="video-wrapper">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlayCanvas"></canvas>
+      </div>
 
-  <div class="controls">
-    <div class="status-badge">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">camera off</span>
-      <span class="face-status" id="faceStatus">👤 detecting...</span>
-      <span class="reaction-display" id="reactionDisplay">⏱️ last: --ms</span>
+      <div class="controls">
+        <div class="status-badge">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">camera off</span>
+          <span class="face-status" id="faceStatus">👤 detecting...</span>
+          <span class="reaction-display" id="reactionDisplay"
+            >⏱️ last: --ms</span
+          >
+        </div>
+        <div class="mode-selector" id="modeSelector">
+          <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
+          <button class="mode-btn" data-mode="blink">💥 Blink</button>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="startBtn">▶ Start</button>
+          <button class="btn btn-secondary" id="resetBtn">⟲ Reset</button>
+          <button class="btn btn-fullscreen" id="fullscreenBtn">⛶ Full</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <span
+          >🤛 <span class="stat-value" id="punchCount">0</span> punches</span
+        >
+        <span>🛡️ <span class="stat-value" id="safeCount">0</span> safe</span>
+        <span>🎯 <span id="modeStatus">dodge</span></span>
+        <span>⚡ <span id="speedLevel">level 1</span></span>
+      </div>
     </div>
-    <div class="mode-selector" id="modeSelector">
-      <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
-      <button class="mode-btn" data-mode="blink">💥 Blink</button>
-    </div>
-    <div class="btn-group">
-      <button class="btn btn-primary" id="startBtn">▶ Start</button>
-      <button class="btn btn-secondary" id="resetBtn">⟲ Reset</button>
-    </div>
-  </div>
 
-  <div class="stats">
-    <span>🤛 <span class="stat-value" id="punchCount">0</span> punches</span>
-    <span>🛡️ <span class="stat-value" id="safeCount">0</span> safe</span>
-    <span>🎯 <span id="modeStatus">dodge</span></span>
-    <span>⚡ <span id="speedLevel">level 1</span></span>
-  </div>
-</div>
+    <script>
+      (function () {
+        // ----- DOM -----
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("overlayCanvas");
+        const ctx = canvas.getContext("2d");
+        const appCard = document.getElementById("appCard");
 
-<script>
-  (function() {
-    // ----- DOM -----
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('overlayCanvas');
-    const ctx = canvas.getContext('2d');
+        const statusDot = document.getElementById("statusDot");
+        const statusText = document.getElementById("statusText");
+        const faceStatus = document.getElementById("faceStatus");
+        const modeStatus = document.getElementById("modeStatus");
+        const punchCountEl = document.getElementById("punchCount");
+        const safeCountEl = document.getElementById("safeCount");
+        const reactionDisplay = document.getElementById("reactionDisplay");
+        const speedLevel = document.getElementById("speedLevel");
 
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const faceStatus = document.getElementById('faceStatus');
-    const modeStatus = document.getElementById('modeStatus');
-    const punchCountEl = document.getElementById('punchCount');
-    const safeCountEl = document.getElementById('safeCount');
-    const reactionDisplay = document.getElementById('reactionDisplay');
-    const speedLevel = document.getElementById('speedLevel');
+        const startBtn = document.getElementById("startBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const fullscreenBtn = document.getElementById("fullscreenBtn");
+        const modeBtns = document.querySelectorAll(".mode-btn");
 
-    const startBtn = document.getElementById('startBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const modeBtns = document.querySelectorAll('.mode-btn');
-
-    // ----- state -----
-    let stream = null;
-    let isCameraReady = false;
-    let animationFrame = null;
-    let gameActive = false;
-
-    // counters
-    let punches = 0;
-    let safe = 0;
-    let lastReactionTime = 0;
-    let hasValidReaction = false;
-
-    // glove
-    let gloveX = 0.5, gloveY = 0.5;
-    const GLOVE_RADIUS = 0.055;
-
-    let dirX = 0.7, dirY = 0.5;
-    const SPEED = 0.007;
-
-    // blink mode - progressive speed
-    let blinkTimer = 0;
-    let blinkInterval = 50;
-    const MIN_INTERVAL = 12;
-    const MAX_INTERVAL = 50;
-    let blinkLevel = 1;
-    let gloveVisible = true;
-    let reactionStartTime = 0;
-    let isMeasuringReaction = false;
-
-    let currentMode = 'dodge';
-    let hitCooldown = 0;
-    const COOLDOWN_FRAMES = 20;
-
-    // Face position tracking
-    let faceCenterX = 0.5;
-    let faceCenterY = 0.5;
-    let faceRadius = 0.1;
-
-    // ----- Face detection -----
-    let faceMesh = null;
-    let faceLandmarks = null;
-    let faceDetectionReady = false;
-    let faceDetectionAttempted = false;
-
-    async function loadFaceDetection() {
-      if (faceDetectionAttempted) return;
-      faceDetectionAttempted = true;
-      
-      try {
-        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
-        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
-        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
-
-        faceMesh = new FaceMesh({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-        });
-
-        faceMesh.setOptions({
-          maxNumFaces: 1,
-          refineLandmarks: true,
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.5
-        });
-
-        faceMesh.onResults((results) => {
-          if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-            faceLandmarks = results.multiFaceLandmarks[0];
-            
-            // Calculate face center from landmarks
-            let sumX = 0, sumY = 0, count = 0;
-            for (const lm of faceLandmarks) {
-              sumX += lm.x;
-              sumY += lm.y;
-              count++;
+        // ----- Fullscreen -----
+        function toggleFullscreen() {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+              console.warn("Fullscreen error:", err);
+            });
+            document.body.classList.add("fullscreen-mode");
+            fullscreenBtn.textContent = "⛶ Exit";
+          } else {
+            if (document.exitFullscreen) {
+              document.exitFullscreen();
             }
-            if (count > 0) {
-              // Mirror X to match video
-              faceCenterX = 1 - (sumX / count);
-              faceCenterY = sumY / count;
-              
-              // Calculate face radius (approximate from nose to face edge)
-              const nose = faceLandmarks[1];
-              const cheek = faceLandmarks[234];
-              if (nose && cheek) {
-                const dx = (1 - nose.x) - (1 - cheek.x);
-                const dy = nose.y - cheek.y;
-                faceRadius = Math.hypot(dx, dy) * 1.2;
+            document.body.classList.remove("fullscreen-mode");
+            fullscreenBtn.textContent = "⛶ Full";
+          }
+        }
+
+        document.addEventListener("fullscreenchange", () => {
+          if (!document.fullscreenElement) {
+            document.body.classList.remove("fullscreen-mode");
+            fullscreenBtn.textContent = "⛶ Full";
+            // Resize canvas when exiting fullscreen
+            setTimeout(resizeCanvas, 100);
+          } else {
+            setTimeout(resizeCanvas, 100);
+          }
+        });
+
+        fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+        // ----- state -----
+        let stream = null;
+        let isCameraReady = false;
+        let animationFrame = null;
+        let gameActive = false;
+
+        // counters
+        let punches = 0;
+        let safe = 0;
+        let lastReactionTime = 0;
+        let hasValidReaction = false;
+
+        // glove
+        let gloveX = 0.5,
+          gloveY = 0.5;
+        const GLOVE_RADIUS = 0.055;
+
+        let dirX = 0.7,
+          dirY = 0.5;
+        const SPEED = 0.007;
+
+        // blink mode - progressive speed
+        let blinkTimer = 0;
+        let blinkInterval = 50;
+        const MIN_INTERVAL = 12;
+        const MAX_INTERVAL = 50;
+        let blinkLevel = 1;
+        let gloveVisible = true;
+        let reactionStartTime = 0;
+        let isMeasuringReaction = false;
+        let gracePeriodActive = false;
+        let gracePeriodStartTime = 0;
+        const GRACE_PERIOD_MS = 100; // 100ms grace period
+
+        let currentMode = "dodge";
+        let hitCooldown = 0;
+        const COOLDOWN_FRAMES = 20;
+
+        // Face position tracking
+        let faceCenterX = 0.5;
+        let faceCenterY = 0.5;
+        let faceRadius = 0.1;
+
+        // ----- Face detection -----
+        let faceMesh = null;
+        let faceLandmarks = null;
+        let faceDetectionReady = false;
+        let faceDetectionAttempted = false;
+
+        async function loadFaceDetection() {
+          if (faceDetectionAttempted) return;
+          faceDetectionAttempted = true;
+
+          try {
+            await loadScript(
+              "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js",
+            );
+            await loadScript(
+              "https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js",
+            );
+            await loadScript(
+              "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
+            );
+
+            faceMesh = new FaceMesh({
+              locateFile: (file) =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+            });
+
+            faceMesh.setOptions({
+              maxNumFaces: 1,
+              refineLandmarks: true,
+              minDetectionConfidence: 0.6,
+              minTrackingConfidence: 0.5,
+            });
+
+            faceMesh.onResults((results) => {
+              if (
+                results.multiFaceLandmarks &&
+                results.multiFaceLandmarks.length > 0
+              ) {
+                faceLandmarks = results.multiFaceLandmarks[0];
+
+                let sumX = 0,
+                  sumY = 0,
+                  count = 0;
+                for (const lm of faceLandmarks) {
+                  sumX += lm.x;
+                  sumY += lm.y;
+                  count++;
+                }
+                if (count > 0) {
+                  faceCenterX = 1 - sumX / count;
+                  faceCenterY = sumY / count;
+
+                  const nose = faceLandmarks[1];
+                  const cheek = faceLandmarks[234];
+                  if (nose && cheek) {
+                    const dx = 1 - nose.x - (1 - cheek.x);
+                    const dy = nose.y - cheek.y;
+                    faceRadius = Math.hypot(dx, dy) * 1.2;
+                  }
+                }
+
+                faceStatus.textContent = "👤 face detected";
+                faceStatus.style.color = "#8af";
+              } else {
+                faceLandmarks = null;
+                faceStatus.textContent = "👤 scanning...";
+                faceStatus.style.color = "#a88";
+              }
+            });
+
+            const camera = new Camera(video, {
+              onFrame: async () => {
+                if (faceMesh && isCameraReady) {
+                  try {
+                    await faceMesh.send({ image: video });
+                  } catch (e) {}
+                }
+              },
+              width: 640,
+              height: 480,
+            });
+
+            await camera.start();
+            faceDetectionReady = true;
+            faceStatus.textContent = "👤 ready";
+            faceStatus.style.color = "#8af";
+          } catch (err) {
+            console.warn("Face detection unavailable:", err);
+            faceStatus.textContent = "⚠️ face unavailable";
+            faceDetectionReady = false;
+          }
+        }
+
+        function loadScript(src) {
+          return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+
+        // ----- canvas resize -----
+        function resizeCanvas() {
+          const wrapper = canvas.parentElement;
+          const rect = wrapper.getBoundingClientRect();
+          canvas.width = rect.width * devicePixelRatio;
+          canvas.height = rect.height * devicePixelRatio;
+          canvas.style.width = rect.width + "px";
+          canvas.style.height = rect.height + "px";
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        // ----- camera -----
+        async function startCamera() {
+          try {
+            if (stream) {
+              stream.getTracks().forEach((t) => t.stop());
+              stream = null;
+            }
+
+            const constraints = {
+              video: {
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                frameRate: { ideal: 30 },
+              },
+            };
+
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            await video.play();
+            isCameraReady = true;
+            statusDot.className = "dot";
+            statusText.innerText = "camera on";
+            resizeCanvas();
+
+            if (!faceDetectionAttempted) {
+              await loadFaceDetection();
+            }
+
+            if (!animationFrame) loop();
+          } catch (err) {
+            console.warn("camera error", err);
+            isCameraReady = false;
+            statusDot.className = "dot inactive";
+            statusText.innerText = "camera blocked";
+            alert("Please allow camera access.");
+          }
+        }
+
+        // ----- draw face border -----
+        function drawFaceBorder() {
+          if (!faceLandmarks || !faceDetectionReady) return;
+
+          const w = canvas.width,
+            h = canvas.height;
+
+          const faceOutline = [
+            10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365,
+            379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93,
+            234, 127, 162, 21, 54, 103, 67, 109, 10,
+          ];
+
+          ctx.beginPath();
+          let first = true;
+          for (const idx of faceOutline) {
+            const lm = faceLandmarks[idx];
+            if (!lm) continue;
+            const x = (1 - lm.x) * w;
+            const y = lm.y * h;
+            if (first) {
+              ctx.moveTo(x, y);
+              first = false;
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.closePath();
+
+          ctx.shadowColor = "#00ffcc";
+          ctx.shadowBlur = 25;
+          ctx.strokeStyle = "#00ffcc";
+          ctx.lineWidth = 4;
+          ctx.stroke();
+
+          ctx.shadowBlur = 40;
+          ctx.strokeStyle = "rgba(0, 255, 204, 0.3)";
+          ctx.lineWidth = 8;
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+
+          const centerX = faceCenterX * w;
+          const centerY = faceCenterY * h;
+          const radius = faceRadius * Math.min(w, h);
+
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+          ctx.strokeStyle = "rgba(255, 100, 100, 0.3)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // ----- draw boxing glove -----
+        function drawGlove(x, y, radius, visible, isHit) {
+          const w = canvas.width,
+            h = canvas.height;
+          const px = x * w,
+            py = y * h;
+          const r = Math.min(w, h) * radius;
+
+          if (!visible) {
+            ctx.beginPath();
+            ctx.arc(px, py, r * 0.9, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(150,150,180,0.25)";
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 8]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            return;
+          }
+
+          const grad = ctx.createRadialGradient(
+            px,
+            py,
+            r * 0.2,
+            px,
+            py,
+            r * 2.5,
+          );
+          grad.addColorStop(
+            0,
+            isHit ? "#ff6644" : currentMode === "blink" ? "#ffcc55" : "#ff8a3a",
+          );
+          grad.addColorStop(
+            0.7,
+            isHit ? "#cc3322" : currentMode === "blink" ? "#cc8833" : "#cc5522",
+          );
+          grad.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.beginPath();
+          ctx.arc(px, py, r * 2.2, 0, 2 * Math.PI);
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.shadowColor = isHit ? "#ff4422" : "#ffaa44";
+          ctx.shadowBlur = 30;
+          ctx.font = `${r * 2.2}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = isHit
+            ? "#ff4433"
+            : currentMode === "blink"
+              ? "#f5b342"
+              : "#e6732e";
+          ctx.fillText("🥊", px, py - r * 0.1);
+
+          ctx.shadowBlur = 12;
+          ctx.beginPath();
+          ctx.arc(px + r * 0.2, py - r * 0.15, r * 0.45, 0, 2 * Math.PI);
+          ctx.fillStyle = isHit
+            ? "#dd3322"
+            : currentMode === "blink"
+              ? "#dba23a"
+              : "#cc6622";
+          ctx.fill();
+
+          ctx.shadowBlur = 0;
+          ctx.beginPath();
+          ctx.arc(px - r * 0.25, py - r * 0.35, r * 0.15, 0, 2 * Math.PI);
+          ctx.fillStyle = "rgba(255,255,240,0.4)";
+          ctx.fill();
+
+          ctx.font = `bold ${r * 0.8}px monospace`;
+          ctx.fillStyle = "rgba(255,255,220,0.7)";
+          ctx.shadowBlur = 0;
+          ctx.fillText("✕", px + r * 0.1, py - r * 0.1);
+          ctx.shadowBlur = 0;
+        }
+
+        // ----- draw user indicator -----
+        function drawUser() {
+          const w = canvas.width,
+            h = canvas.height;
+
+          let cx, cy;
+          if (faceLandmarks && faceDetectionReady) {
+            cx = faceCenterX * w;
+            cy = faceCenterY * h;
+          } else {
+            cx = w * 0.5;
+            cy = h * 0.5;
+          }
+
+          const r = Math.min(w, h) * 0.085;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 4, 0, 2 * Math.PI);
+          ctx.strokeStyle = "rgba(180, 200, 255, 0.2)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+          ctx.fillStyle = "rgba(70, 130, 255, 0.12)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(150, 200, 255, 0.4)";
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          ctx.font = `${Math.min(w, h) * 0.028}px system-ui`;
+          ctx.fillStyle = "rgba(200, 220, 255, 0.45)";
+          ctx.textAlign = "center";
+          ctx.fillText("⏺ you", cx, cy + r + 22);
+        }
+
+        // ----- collision & update -----
+        function updateGame() {
+          if (!gameActive || !isCameraReady) return;
+
+          let userX, userY;
+          if (faceLandmarks && faceDetectionReady) {
+            userX = faceCenterX;
+            userY = faceCenterY;
+          } else {
+            userX = 0.5;
+            userY = 0.5;
+          }
+
+          const dx = gloveX - userX;
+          const dy = gloveY - userY;
+          const dist = Math.hypot(dx, dy);
+
+          const userRadius = Math.max(faceRadius, 0.085);
+          const threshold = GLOVE_RADIUS + userRadius;
+
+          if (currentMode === "blink") {
+            blinkTimer--;
+
+            if (blinkTimer <= 0) {
+              gloveVisible = !gloveVisible;
+
+              if (gloveVisible) {
+                // Glove appears - start measuring reaction with grace period
+                isMeasuringReaction = true;
+                gracePeriodActive = true;
+                gracePeriodStartTime = performance.now();
+                reactionStartTime = performance.now();
+
+                if (blinkInterval > MIN_INTERVAL) {
+                  blinkInterval = Math.max(MIN_INTERVAL, blinkInterval - 0.5);
+                  blinkLevel =
+                    Math.floor((MAX_INTERVAL - blinkInterval) / 3) + 1;
+                  speedLevel.textContent = `level ${Math.min(blinkLevel, 15)}`;
+                }
+
+                gloveX = 0.15 + Math.random() * 0.7;
+                gloveY = 0.15 + Math.random() * 0.7;
+                const a = Math.random() * 2 * Math.PI;
+                dirX = Math.cos(a);
+                dirY = Math.sin(a);
+                const l = Math.hypot(dirX, dirY);
+                if (l > 0) {
+                  dirX /= l;
+                  dirY /= l;
+                }
+              } else {
+                isMeasuringReaction = false;
+                gracePeriodActive = false;
+              }
+
+              blinkTimer = Math.floor(blinkInterval);
+            }
+
+            // Check collision with face
+            if (gloveVisible && dist < threshold) {
+              // Check if grace period has passed
+              const now = performance.now();
+              if (gracePeriodActive) {
+                const elapsed = now - gracePeriodStartTime;
+                if (elapsed >= GRACE_PERIOD_MS) {
+                  gracePeriodActive = false;
+                }
+              }
+
+              if (hitCooldown <= 0 && !gracePeriodActive) {
+                punches++;
+                punchCountEl.textContent = punches;
+                hitCooldown = COOLDOWN_FRAMES;
+
+                if (isMeasuringReaction) {
+                  const reactionTime = performance.now() - reactionStartTime;
+                  lastReactionTime = reactionTime;
+                  hasValidReaction = true;
+                  reactionDisplay.textContent = `⏱️ last: ${Math.round(reactionTime)}ms`;
+                  isMeasuringReaction = false;
+                  gracePeriodActive = false;
+                }
+
+                if (dist > 0.001) {
+                  gloveX += (dx / dist) * 0.06;
+                  gloveY += (dy / dist) * 0.06;
+                }
+                dirX *= -1.2;
+                dirY *= -1.2;
+                const l = Math.hypot(dirX, dirY);
+                if (l > 0) {
+                  dirX /= l;
+                  dirY /= l;
+                }
+              }
+            } else if (
+              gloveVisible &&
+              dist > threshold + 0.02 &&
+              hitCooldown <= 0
+            ) {
+              safe++;
+              safeCountEl.textContent = safe;
+            }
+
+            if (hitCooldown > 0) hitCooldown--;
+            return;
+          }
+
+          // DODGE mode
+          gloveX += dirX * SPEED;
+          gloveY += dirY * SPEED;
+
+          const margin = GLOVE_RADIUS * 1.3;
+          if (gloveX < margin) {
+            gloveX = margin;
+            dirX *= -1;
+          }
+          if (gloveX > 1 - margin) {
+            gloveX = 1 - margin;
+            dirX *= -1;
+          }
+          if (gloveY < margin) {
+            gloveY = margin;
+            dirY *= -1;
+          }
+          if (gloveY > 1 - margin) {
+            gloveY = 1 - margin;
+            dirY *= -1;
+          }
+
+          if (Math.random() < 0.01) {
+            const ang = (Math.random() - 0.5) * 0.8;
+            const c = Math.cos(ang),
+              s = Math.sin(ang);
+            const nx = dirX * c - dirY * s;
+            const ny = dirX * s + dirY * c;
+            dirX = nx;
+            dirY = ny;
+            const l = Math.hypot(dirX, dirY);
+            if (l > 0) {
+              dirX /= l;
+              dirY /= l;
+            }
+          }
+
+          if (dist < threshold) {
+            if (hitCooldown <= 0) {
+              punches++;
+              punchCountEl.textContent = punches;
+              hitCooldown = COOLDOWN_FRAMES;
+              if (dist > 0.001) {
+                gloveX += (dx / dist) * 0.05;
+                gloveY += (dy / dist) * 0.05;
+              }
+              dirX *= -1.3;
+              dirY *= -1.3;
+              const l = Math.hypot(dirX, dirY);
+              if (l > 0) {
+                dirX /= l;
+                dirY /= l;
               }
             }
-            
-            faceStatus.textContent = '👤 face detected';
-            faceStatus.style.color = '#8af';
           } else {
-            faceLandmarks = null;
-            faceStatus.textContent = '👤 scanning...';
-            faceStatus.style.color = '#a88';
+            if (dist > threshold + 0.025 && hitCooldown <= 0) {
+              safe++;
+              safeCountEl.textContent = safe;
+            }
           }
-        });
 
-        const camera = new Camera(video, {
-          onFrame: async () => {
-            if (faceMesh && isCameraReady) {
-              try {
-                await faceMesh.send({ image: video });
-              } catch (e) {}
-            }
-          },
-          width: 640,
-          height: 480
-        });
-        
-        await camera.start();
-        faceDetectionReady = true;
-        faceStatus.textContent = '👤 ready';
-        faceStatus.style.color = '#8af';
-        
-      } catch (err) {
-        console.warn('Face detection unavailable:', err);
-        faceStatus.textContent = '⚠️ face unavailable';
-        faceDetectionReady = false;
-      }
-    }
-
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    }
-
-    // ----- canvas resize -----
-    function resizeCanvas() {
-      const wrapper = canvas.parentElement;
-      const rect = wrapper.getBoundingClientRect();
-      canvas.width = rect.width * devicePixelRatio;
-      canvas.height = rect.height * devicePixelRatio;
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-    }
-
-    // ----- camera -----
-    async function startCamera() {
-      try {
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-          stream = null;
-        }
-        
-        const constraints = { 
-          video: { 
-            facingMode: 'user', 
-            width: { ideal: 640 }, 
-            height: { ideal: 480 },
-            frameRate: { ideal: 30 }
-          } 
-        };
-        
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = stream;
-        await video.play();
-        isCameraReady = true;
-        statusDot.className = 'dot';
-        statusText.innerText = 'camera on';
-        resizeCanvas();
-
-        if (!faceDetectionAttempted) {
-          await loadFaceDetection();
+          if (hitCooldown > 0) hitCooldown--;
         }
 
-        if (!animationFrame) loop();
-        
-      } catch (err) {
-        console.warn('camera error', err);
-        isCameraReady = false;
-        statusDot.className = 'dot inactive';
-        statusText.innerText = 'camera blocked';
-        alert('Please allow camera access.');
-      }
-    }
+        // ----- render loop -----
+        function loop() {
+          if (!isCameraReady) {
+            drawOverlay();
+            animationFrame = requestAnimationFrame(loop);
+            return;
+          }
 
-    // ----- draw face border (complete face outline only) -----
-    function drawFaceBorder() {
-      if (!faceLandmarks || !faceDetectionReady) return;
-
-      const w = canvas.width, h = canvas.height;
-      
-      const faceOutline = [
-        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 
-        400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 
-        54, 103, 67, 109, 10
-      ];
-      
-      ctx.beginPath();
-      let first = true;
-      for (const idx of faceOutline) {
-        const lm = faceLandmarks[idx];
-        if (!lm) continue;
-        const x = (1 - lm.x) * w;
-        const y = lm.y * h;
-        if (first) {
-          ctx.moveTo(x, y);
-          first = false;
-        } else {
-          ctx.lineTo(x, y);
+          updateGame();
+          drawOverlay();
+          animationFrame = requestAnimationFrame(loop);
         }
-      }
-      ctx.closePath();
-      
-      ctx.shadowColor = '#00ffcc';
-      ctx.shadowBlur = 25;
-      ctx.strokeStyle = '#00ffcc';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      
-      ctx.shadowBlur = 40;
-      ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
-      ctx.lineWidth = 8;
-      ctx.stroke();
-      
-      ctx.shadowBlur = 0;
 
-      // Draw face detection area (for debugging)
-      const centerX = faceCenterX * w;
-      const centerY = faceCenterY * h;
-      const radius = faceRadius * Math.min(w, h);
-      
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+        function drawOverlay() {
+          const w = canvas.width,
+            h = canvas.height;
+          ctx.clearRect(0, 0, w, h);
 
-    // ----- draw boxing glove -----
-    function drawGlove(x, y, radius, visible, isHit) {
-      const w = canvas.width, h = canvas.height;
-      const px = x * w, py = y * h;
-      const r = Math.min(w, h) * radius;
+          drawFaceBorder();
+          drawUser();
 
-      if (!visible) {
-        ctx.beginPath();
-        ctx.arc(px, py, r * 0.9, 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(150,150,180,0.25)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 8]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        return;
-      }
+          const isHit = hitCooldown > 0;
+          const visible = currentMode === "blink" ? gloveVisible : true;
+          drawGlove(gloveX, gloveY, GLOVE_RADIUS, visible, isHit);
 
-      const grad = ctx.createRadialGradient(px, py, r * 0.2, px, py, r * 2.5);
-      grad.addColorStop(0, isHit ? '#ff6644' : (currentMode === 'blink' ? '#ffcc55' : '#ff8a3a'));
-      grad.addColorStop(0.7, isHit ? '#cc3322' : (currentMode === 'blink' ? '#cc8833' : '#cc5522'));
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.beginPath();
-      ctx.arc(px, py, r * 2.2, 0, 2 * Math.PI);
-      ctx.fillStyle = grad;
-      ctx.fill();
+          // Show grace period indicator
+          if (gracePeriodActive) {
+            ctx.font = `bold ${Math.min(w, h) * 0.04}px system-ui`;
+            ctx.fillStyle = "rgba(255, 216, 102, 0.6)";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.fillText("🛡️ GRACE", w / 2, 16);
+          }
 
-      ctx.shadowColor = isHit ? '#ff4422' : '#ffaa44';
-      ctx.shadowBlur = 30;
-      ctx.font = `${r * 2.2}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = isHit ? '#ff4433' : (currentMode === 'blink' ? '#f5b342' : '#e6732e');
-      ctx.fillText('🥊', px, py - r * 0.1);
+          ctx.font = `bold ${Math.min(w, h) * 0.035}px system-ui`;
+          ctx.fillStyle = "rgba(200,215,255,0.2)";
+          ctx.textAlign = "right";
+          ctx.textBaseline = "top";
+          ctx.fillText(currentMode.toUpperCase(), w - 20, 16);
 
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.arc(px + r * 0.2, py - r * 0.15, r * 0.45, 0, 2 * Math.PI);
-      ctx.fillStyle = isHit ? '#dd3322' : (currentMode === 'blink' ? '#dba23a' : '#cc6622');
-      ctx.fill();
+          if (faceLandmarks) {
+            ctx.font = "14px system-ui";
+            ctx.fillStyle = "rgba(0, 255, 200, 0.3)";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "bottom";
+            ctx.fillText("✓ face tracked", 16, h - 16);
+          }
 
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.arc(px - r * 0.25, py - r * 0.35, r * 0.15, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(255,255,240,0.4)';
-      ctx.fill();
+          if (
+            currentMode === "blink" &&
+            hasValidReaction &&
+            lastReactionTime > 0
+          ) {
+            ctx.font = "bold 18px system-ui";
+            ctx.fillStyle = "rgba(255, 216, 102, 0.8)";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText(`⚡ ${Math.round(lastReactionTime)}ms`, w / 2, h - 16);
+          }
+        }
 
-      ctx.font = `bold ${r * 0.8}px monospace`;
-      ctx.fillStyle = 'rgba(255,255,220,0.7)';
-      ctx.shadowBlur = 0;
-      ctx.fillText('✕', px + r * 0.1, py - r * 0.1);
-      ctx.shadowBlur = 0;
-    }
+        // ----- controls -----
+        function startGame() {
+          if (!isCameraReady) {
+            startCamera().then(() => {
+              if (isCameraReady) {
+                gameActive = true;
+                statusText.innerText = "training";
+                modeStatus.textContent = currentMode;
+                resetCounters();
+                resetGlove();
+                resetBlinkSpeed();
+              }
+            });
+            return;
+          }
+          gameActive = true;
+          statusText.innerText = "training";
+          modeStatus.textContent = currentMode;
+          resetCounters();
+          resetGlove();
+          resetBlinkSpeed();
+        }
 
-    // ----- draw user indicator (face position) -----
-    function drawUser() {
-      const w = canvas.width, h = canvas.height;
-      
-      // Use face position if available, otherwise center
-      let cx, cy;
-      if (faceLandmarks && faceDetectionReady) {
-        cx = faceCenterX * w;
-        cy = faceCenterY * h;
-      } else {
-        cx = w * 0.5;
-        cy = h * 0.5;
-      }
-      
-      const r = Math.min(w, h) * 0.085;
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 4, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(180, 200, 255, 0.2)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(70, 130, 255, 0.12)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(150, 200, 255, 0.4)';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      ctx.font = `${Math.min(w,h) * 0.028}px system-ui`;
-      ctx.fillStyle = 'rgba(200, 220, 255, 0.45)';
-      ctx.textAlign = 'center';
-      ctx.fillText('⏺ you', cx, cy + r + 22);
-    }
-
-    // ----- collision & update -----
-    function updateGame() {
-      if (!gameActive || !isCameraReady) return;
-
-      // Get user position (face center or fallback to center)
-      let userX, userY;
-      if (faceLandmarks && faceDetectionReady) {
-        userX = faceCenterX;
-        userY = faceCenterY;
-      } else {
-        userX = 0.5;
-        userY = 0.5;
-      }
-
-      const dx = gloveX - userX;
-      const dy = gloveY - userY;
-      const dist = Math.hypot(dx, dy);
-      
-      // Use face radius for collision detection
-      const userRadius = Math.max(faceRadius, 0.085);
-      const threshold = GLOVE_RADIUS + userRadius;
-
-      if (currentMode === 'blink') {
-        blinkTimer--;
-        
-        if (blinkTimer <= 0) {
-          gloveVisible = !gloveVisible;
-          
-          if (gloveVisible) {
-            // Glove appears - start measuring reaction time
-            isMeasuringReaction = true;
-            reactionStartTime = performance.now();
-            
-            // Increase speed gradually
-            if (blinkInterval > MIN_INTERVAL) {
-              blinkInterval = Math.max(MIN_INTERVAL, blinkInterval - 0.5);
-              blinkLevel = Math.floor((MAX_INTERVAL - blinkInterval) / 3) + 1;
-              speedLevel.textContent = `level ${Math.min(blinkLevel, 15)}`;
-            }
-            
-            // Random position
-            gloveX = 0.15 + Math.random() * 0.7;
-            gloveY = 0.15 + Math.random() * 0.7;
-            const a = Math.random() * 2 * Math.PI;
-            dirX = Math.cos(a);
-            dirY = Math.sin(a);
-            const l = Math.hypot(dirX, dirY);
-            if (l > 0) { dirX /= l; dirY /= l; }
-          } else {
-            // Glove disappears - stop measuring reaction (no punch recorded)
+        function resetGame() {
+          gameActive = false;
+          statusText.innerText = isCameraReady ? "camera on" : "camera off";
+          modeStatus.textContent = "⏸";
+          resetCounters();
+          resetGlove();
+          resetBlinkSpeed();
+          hitCooldown = 0;
+          gracePeriodActive = false;
+          if (currentMode === "blink") {
+            gloveVisible = true;
+            blinkTimer = Math.floor(blinkInterval);
             isMeasuringReaction = false;
           }
-          
+          drawOverlay();
+        }
+
+        function resetCounters() {
+          punches = 0;
+          safe = 0;
+          punchCountEl.textContent = "0";
+          safeCountEl.textContent = "0";
+          lastReactionTime = 0;
+          hasValidReaction = false;
+          reactionDisplay.textContent = "⏱️ last: --ms";
+        }
+
+        function resetBlinkSpeed() {
+          blinkInterval = MAX_INTERVAL;
+          blinkLevel = 1;
+          speedLevel.textContent = "level 1";
           blinkTimer = Math.floor(blinkInterval);
+          gloveVisible = true;
+          isMeasuringReaction = false;
+          gracePeriodActive = false;
         }
 
-        // Check collision with face - ONLY when glove is visible
-        if (gloveVisible && dist < threshold) {
-          if (hitCooldown <= 0) {
-            punches++;
-            punchCountEl.textContent = punches;
-            hitCooldown = COOLDOWN_FRAMES;
-            
-            // ONLY record reaction time if we're actively measuring (glove just appeared)
-            if (isMeasuringReaction) {
-              const reactionTime = performance.now() - reactionStartTime;
-              lastReactionTime = reactionTime;
-              hasValidReaction = true;
-              reactionDisplay.textContent = `⏱️ last: ${Math.round(reactionTime)}ms`;
-              isMeasuringReaction = false;
-            }
-            
-            if (dist > 0.001) {
-              gloveX += (dx / dist) * 0.06;
-              gloveY += (dy / dist) * 0.06;
-            }
-            dirX *= -1.2; dirY *= -1.2;
-            const l = Math.hypot(dirX, dirY);
-            if (l > 0) { dirX /= l; dirY /= l; }
-          }
-        } else if (gloveVisible && dist > threshold + 0.02 && hitCooldown <= 0) {
-          safe++;
-          safeCountEl.textContent = safe;
-        }
-        
-        if (hitCooldown > 0) hitCooldown--;
-        return;
-      }
-
-      // DODGE mode
-      gloveX += dirX * SPEED;
-      gloveY += dirY * SPEED;
-
-      const margin = GLOVE_RADIUS * 1.3;
-      if (gloveX < margin) { gloveX = margin; dirX *= -1; }
-      if (gloveX > 1 - margin) { gloveX = 1 - margin; dirX *= -1; }
-      if (gloveY < margin) { gloveY = margin; dirY *= -1; }
-      if (gloveY > 1 - margin) { gloveY = 1 - margin; dirY *= -1; }
-
-      if (Math.random() < 0.01) {
-        const ang = (Math.random() - 0.5) * 0.8;
-        const c = Math.cos(ang), s = Math.sin(ang);
-        const nx = dirX * c - dirY * s;
-        const ny = dirX * s + dirY * c;
-        dirX = nx; dirY = ny;
-        const l = Math.hypot(dirX, dirY);
-        if (l > 0) { dirX /= l; dirY /= l; }
-      }
-
-      if (dist < threshold) {
-        if (hitCooldown <= 0) {
-          punches++;
-          punchCountEl.textContent = punches;
-          hitCooldown = COOLDOWN_FRAMES;
-          if (dist > 0.001) {
-            gloveX += (dx / dist) * 0.05;
-            gloveY += (dy / dist) * 0.05;
-          }
-          dirX *= -1.3; dirY *= -1.3;
+        function resetGlove() {
+          gloveX = 0.3 + Math.random() * 0.4;
+          gloveY = 0.3 + Math.random() * 0.4;
+          const a = Math.random() * 2 * Math.PI;
+          dirX = Math.cos(a);
+          dirY = Math.sin(a);
           const l = Math.hypot(dirX, dirY);
-          if (l > 0) { dirX /= l; dirY /= l; }
-        }
-      } else {
-        if (dist > threshold + 0.025 && hitCooldown <= 0) {
-          safe++;
-          safeCountEl.textContent = safe;
-        }
-      }
-
-      if (hitCooldown > 0) hitCooldown--;
-    }
-
-    // ----- render loop -----
-    function loop() {
-      if (!isCameraReady) {
-        drawOverlay();
-        animationFrame = requestAnimationFrame(loop);
-        return;
-      }
-
-      updateGame();
-      drawOverlay();
-      animationFrame = requestAnimationFrame(loop);
-    }
-
-    function drawOverlay() {
-      const w = canvas.width, h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-
-      drawFaceBorder();
-      drawUser();
-
-      const isHit = hitCooldown > 0;
-      const visible = (currentMode === 'blink') ? gloveVisible : true;
-      drawGlove(gloveX, gloveY, GLOVE_RADIUS, visible, isHit);
-
-      ctx.font = `bold ${Math.min(w,h) * 0.035}px system-ui`;
-      ctx.fillStyle = 'rgba(200,215,255,0.2)';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'top';
-      ctx.fillText(currentMode.toUpperCase(), w - 20, 16);
-      
-      if (faceLandmarks) {
-        ctx.font = '14px system-ui';
-        ctx.fillStyle = 'rgba(0, 255, 200, 0.3)';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('✓ face tracked', 16, h - 16);
-      }
-
-      if (currentMode === 'blink' && hasValidReaction && lastReactionTime > 0) {
-        ctx.font = 'bold 18px system-ui';
-        ctx.fillStyle = 'rgba(255, 216, 102, 0.8)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(`⚡ ${Math.round(lastReactionTime)}ms`, w/2, h - 16);
-      }
-    }
-
-    // ----- controls -----
-    function startGame() {
-      if (!isCameraReady) {
-        startCamera().then(() => {
-          if (isCameraReady) {
-            gameActive = true;
-            statusText.innerText = 'training';
-            modeStatus.textContent = currentMode;
-            resetCounters();
-            resetGlove();
-            resetBlinkSpeed();
+          if (l > 0) {
+            dirX /= l;
+            dirY /= l;
           }
+          if (currentMode === "blink") {
+            gloveVisible = true;
+            blinkTimer = Math.floor(blinkInterval);
+            isMeasuringReaction = false;
+            gracePeriodActive = false;
+          }
+        }
+
+        function setMode(mode) {
+          currentMode = mode;
+          modeBtns.forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.mode === mode);
+          });
+          modeStatus.textContent = mode;
+          resetGlove();
+          resetBlinkSpeed();
+          hitCooldown = 0;
+          gracePeriodActive = false;
+          if (!gameActive) drawOverlay();
+        }
+
+        // ----- event listeners -----
+        startBtn.addEventListener("click", startGame);
+        resetBtn.addEventListener("click", resetGame);
+
+        modeBtns.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const mode = btn.dataset.mode;
+            if (mode !== currentMode) {
+              setMode(mode);
+              if (gameActive) {
+                resetGlove();
+                resetBlinkSpeed();
+                punchCountEl.textContent = punches;
+                safeCountEl.textContent = safe;
+              }
+            }
+          });
         });
-        return;
-      }
-      gameActive = true;
-      statusText.innerText = 'training';
-      modeStatus.textContent = currentMode;
-      resetCounters();
-      resetGlove();
-      resetBlinkSpeed();
-    }
 
-    function resetGame() {
-      gameActive = false;
-      statusText.innerText = isCameraReady ? 'camera on' : 'camera off';
-      modeStatus.textContent = '⏸';
-      resetCounters();
-      resetGlove();
-      resetBlinkSpeed();
-      hitCooldown = 0;
-      if (currentMode === 'blink') {
-        gloveVisible = true;
-        blinkTimer = Math.floor(blinkInterval);
-        isMeasuringReaction = false;
-      }
-      drawOverlay();
-    }
+        const ro = new ResizeObserver(() => resizeCanvas());
+        ro.observe(canvas.parentElement);
 
-    function resetCounters() {
-      punches = 0;
-      safe = 0;
-      punchCountEl.textContent = '0';
-      safeCountEl.textContent = '0';
-      lastReactionTime = 0;
-      hasValidReaction = false;
-      reactionDisplay.textContent = '⏱️ last: --ms';
-    }
-
-    function resetBlinkSpeed() {
-      blinkInterval = MAX_INTERVAL;
-      blinkLevel = 1;
-      speedLevel.textContent = 'level 1';
-      blinkTimer = Math.floor(blinkInterval);
-      gloveVisible = true;
-      isMeasuringReaction = false;
-    }
-
-    function resetGlove() {
-      gloveX = 0.3 + Math.random() * 0.4;
-      gloveY = 0.3 + Math.random() * 0.4;
-      const a = Math.random() * 2 * Math.PI;
-      dirX = Math.cos(a);
-      dirY = Math.sin(a);
-      const l = Math.hypot(dirX, dirY);
-      if (l > 0) { dirX /= l; dirY /= l; }
-      if (currentMode === 'blink') {
-        gloveVisible = true;
-        blinkTimer = Math.floor(blinkInterval);
-        isMeasuringReaction = false;
-      }
-    }
-
-    function setMode(mode) {
-      currentMode = mode;
-      modeBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
-      });
-      modeStatus.textContent = mode;
-      resetGlove();
-      resetBlinkSpeed();
-      hitCooldown = 0;
-      if (!gameActive) drawOverlay();
-    }
-
-    // ----- event listeners -----
-    startBtn.addEventListener('click', startGame);
-    resetBtn.addEventListener('click', resetGame);
-
-    modeBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const mode = btn.dataset.mode;
-        if (mode !== currentMode) {
-          setMode(mode);
-          if (gameActive) {
+        window.addEventListener("load", () => {
+          resizeCanvas();
+          startCamera().then(() => {
             resetGlove();
             resetBlinkSpeed();
-            punchCountEl.textContent = punches;
-            safeCountEl.textContent = safe;
-          }
-        }
-      });
-    });
+            drawOverlay();
+            statusText.innerText = "camera ready";
+            modeStatus.textContent = "press Start";
+            setMode("dodge");
+          });
+        });
 
-    const ro = new ResizeObserver(() => resizeCanvas());
-    ro.observe(canvas.parentElement);
+        window.addEventListener("beforeunload", () => {
+          if (stream) stream.getTracks().forEach((t) => t.stop());
+          if (animationFrame) cancelAnimationFrame(animationFrame);
+        });
 
-    window.addEventListener('load', () => {
-      resizeCanvas();
-      startCamera().then(() => {
-        resetGlove();
-        resetBlinkSpeed();
-        drawOverlay();
-        statusText.innerText = 'camera ready';
-        modeStatus.textContent = 'press Start';
-        setMode('dodge');
-      });
-    });
-
-    window.addEventListener('beforeunload', () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-    });
-
-  })();
-</script>
-</body>
+        // Resize canvas when window resizes (especially important for fullscreen)
+        window.addEventListener("resize", () => {
+          setTimeout(resizeCanvas, 50);
+        });
+      })();
+    </script>
+  </body>
 </html>
