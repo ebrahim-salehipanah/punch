@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Boxing trainer · fast face</title>
+  <title>Boxing trainer · reaction time</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -91,6 +91,7 @@
       align-items: center;
       gap: 10px;
       border: 1px solid #3b445c;
+      flex-wrap: wrap;
     }
     .dot {
       display: inline-block;
@@ -189,13 +190,14 @@
       border-radius: 30px;
       border: 1px solid #3d4f72;
     }
-    .fps-counter {
-      color: #6a7a92;
-      font-size: 0.75rem;
-      background: #141a28;
-      padding: 2px 10px;
-      border-radius: 20px;
-      border: 1px solid #2a3349;
+    .reaction-display {
+      color: #ffd866;
+      font-weight: 600;
+      font-size: 0.85rem;
+      background: #1a2335;
+      padding: 2px 12px;
+      border-radius: 30px;
+      border: 1px solid #3d4f72;
     }
     @media (max-width: 600px) {
       .card { padding: 16px; }
@@ -210,7 +212,7 @@
 <div class="card">
   <h1>
     🥊 BOXING TRAINER
-    <small>fast face</small>
+    <small>reaction time</small>
   </h1>
 
   <div class="video-wrapper">
@@ -223,7 +225,7 @@
       <span class="dot" id="statusDot"></span>
       <span id="statusText">camera off</span>
       <span class="face-status" id="faceStatus">👤 detecting...</span>
-      <span class="fps-counter" id="fpsCounter">⚡ 0 fps</span>
+      <span class="reaction-display" id="reactionDisplay">⏱️ best: --ms</span>
     </div>
     <div class="mode-selector" id="modeSelector">
       <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
@@ -239,6 +241,7 @@
     <span>🤛 <span class="stat-value" id="punchCount">0</span> punches</span>
     <span>🛡️ <span class="stat-value" id="safeCount">0</span> safe</span>
     <span>🎯 <span id="modeStatus">dodge</span></span>
+    <span>⚡ <span id="speedLevel">level 1</span></span>
   </div>
 </div>
 
@@ -255,7 +258,8 @@
     const modeStatus = document.getElementById('modeStatus');
     const punchCountEl = document.getElementById('punchCount');
     const safeCountEl = document.getElementById('safeCount');
-    const fpsCounter = document.getElementById('fpsCounter');
+    const reactionDisplay = document.getElementById('reactionDisplay');
+    const speedLevel = document.getElementById('speedLevel');
 
     const startBtn = document.getElementById('startBtn');
     const resetBtn = document.getElementById('resetBtn');
@@ -270,38 +274,41 @@
     // counters
     let punches = 0;
     let safe = 0;
+    let bestReaction = Infinity;
+    let lastReactionTime = 0;
 
-    // glove (point)
+    // glove
     let gloveX = 0.5, gloveY = 0.5;
     const GLOVE_RADIUS = 0.055;
 
     let dirX = 0.7, dirY = 0.5;
     const SPEED = 0.007;
 
-    // blink mode
+    // blink mode - progressive speed
     let blinkTimer = 0;
-    const BLINK_INTERVAL = 40;
+    let blinkInterval = 50;
+    const MIN_INTERVAL = 12;
+    const MAX_INTERVAL = 50;
+    let blinkLevel = 1;
     let gloveVisible = true;
+    let reactionStartTime = 0;
+    let isMeasuringReaction = false;
 
     let currentMode = 'dodge';
     let hitCooldown = 0;
     const COOLDOWN_FRAMES = 20;
 
-    // ----- Face detection using MediaPipe (optimized) -----
+    // ----- Face detection -----
     let faceMesh = null;
     let faceLandmarks = null;
     let faceDetectionReady = false;
     let faceDetectionAttempted = false;
-    let frameCount = 0;
-    let lastFpsUpdate = 0;
-    let currentFps = 0;
 
     async function loadFaceDetection() {
       if (faceDetectionAttempted) return;
       faceDetectionAttempted = true;
       
       try {
-        // Load MediaPipe libraries
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
@@ -317,7 +324,6 @@
           minTrackingConfidence: 0.5
         });
 
-        // Process results directly - NO separate camera loop
         faceMesh.onResults((results) => {
           if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
             faceLandmarks = results.multiFaceLandmarks[0];
@@ -330,15 +336,12 @@
           }
         });
 
-        // Start face detection on the video stream
         const camera = new Camera(video, {
           onFrame: async () => {
             if (faceMesh && isCameraReady) {
               try {
                 await faceMesh.send({ image: video });
-              } catch (e) {
-                // silent fail
-              }
+              } catch (e) {}
             }
           },
           width: 640,
@@ -347,13 +350,12 @@
         
         await camera.start();
         faceDetectionReady = true;
-        console.log('✅ Face detection ready (fast mode)');
         faceStatus.textContent = '👤 ready';
         faceStatus.style.color = '#8af';
         
       } catch (err) {
         console.warn('Face detection unavailable:', err);
-        faceStatus.textContent = '⚠️ face detection unavailable';
+        faceStatus.textContent = '⚠️ face unavailable';
         faceDetectionReady = false;
       }
     }
@@ -404,7 +406,6 @@
         statusText.innerText = 'camera on';
         resizeCanvas();
 
-        // Load face detection AFTER camera is ready (faster startup)
         if (!faceDetectionAttempted) {
           await loadFaceDetection();
         }
@@ -420,21 +421,25 @@
       }
     }
 
-    // ----- draw face border (mirrored correctly) -----
+    // ----- draw face border (complete face outline only) -----
     function drawFaceBorder() {
       if (!faceLandmarks || !faceDetectionReady) return;
 
       const w = canvas.width, h = canvas.height;
       
-      // Face outline indices (mirrored to match video)
-      const indices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+      // Complete face outline indices (468 landmarks total, using the full face contour)
+      // These indices trace the entire face boundary
+      const faceOutline = [
+        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 
+        400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 
+        54, 103, 67, 109, 10
+      ];
       
       ctx.beginPath();
       let first = true;
-      for (const idx of indices) {
+      for (const idx of faceOutline) {
         const lm = faceLandmarks[idx];
         if (!lm) continue;
-        // Mirror X coordinate to match video flip
         const x = (1 - lm.x) * w;
         const y = lm.y * h;
         if (first) {
@@ -445,62 +450,21 @@
         }
       }
       ctx.closePath();
-      ctx.strokeStyle = '#00ffcc';
-      ctx.lineWidth = 3.5;
+      
+      // Glowing border effect
       ctx.shadowColor = '#00ffcc';
-      ctx.shadowBlur = 18;
+      ctx.shadowBlur = 25;
+      ctx.strokeStyle = '#00ffcc';
+      ctx.lineWidth = 4;
       ctx.stroke();
+      
+      // Secondary glow layer
+      ctx.shadowBlur = 40;
+      ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      
       ctx.shadowBlur = 0;
-
-      // Draw key facial features (mirrored)
-      const features = [
-        { idx: 1, color: '#ffaa55', label: '👁' },   // right eye (mirrored)
-        { idx: 33, color: '#ffaa55', label: '👁' },  // left eye (mirrored)
-        { idx: 0, color: '#ff6b6b', label: '👃' },   // nose
-        { idx: 13, color: '#ff6b6b', label: '👄' },  // mouth
-        { idx: 14, color: '#ff6b6b', label: '👄' }   // mouth
-      ];
-      
-      for (const f of features) {
-        const lm = faceLandmarks[f.idx];
-        if (!lm) continue;
-        const x = (1 - lm.x) * w;
-        const y = lm.y * h;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 2 * Math.PI);
-        ctx.fillStyle = f.color;
-        ctx.shadowColor = f.color;
-        ctx.shadowBlur = 12;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = 'white';
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.fillText(f.label, x + 12, y - 8);
-        ctx.shadowBlur = 0;
-      }
-
-      // Draw face bounding box (for extra clarity)
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const idx of indices) {
-        const lm = faceLandmarks[idx];
-        if (!lm) continue;
-        const x = (1 - lm.x) * w;
-        const y = lm.y * h;
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-      
-      if (minX !== Infinity) {
-        ctx.strokeStyle = 'rgba(0, 255, 200, 0.15)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([5, 8]);
-        ctx.strokeRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
-        ctx.setLineDash([]);
-      }
     }
 
     // ----- draw boxing glove -----
@@ -521,7 +485,6 @@
       }
 
       const grad = ctx.createRadialGradient(px, py, r * 0.2, px, py, r * 2.5);
-      const color = isHit ? '#ff5544' : (currentMode === 'blink' ? '#ffbb44' : '#ff7e2e');
       grad.addColorStop(0, isHit ? '#ff6644' : (currentMode === 'blink' ? '#ffcc55' : '#ff8a3a'));
       grad.addColorStop(0.7, isHit ? '#cc3322' : (currentMode === 'blink' ? '#cc8833' : '#cc5522'));
       grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -557,7 +520,7 @@
       ctx.shadowBlur = 0;
     }
 
-    // ----- draw user indicator (center) -----
+    // ----- draw user indicator -----
     function drawUser() {
       const w = canvas.width, h = canvas.height;
       const cx = w * 0.5, cy = h * 0.5;
@@ -595,10 +558,23 @@
 
       if (currentMode === 'blink') {
         blinkTimer--;
+        
         if (blinkTimer <= 0) {
           gloveVisible = !gloveVisible;
-          blinkTimer = BLINK_INTERVAL;
+          
           if (gloveVisible) {
+            // Glove appears - start measuring reaction time
+            isMeasuringReaction = true;
+            reactionStartTime = performance.now();
+            
+            // Increase speed gradually
+            if (blinkInterval > MIN_INTERVAL) {
+              blinkInterval = Math.max(MIN_INTERVAL, blinkInterval - 0.5);
+              blinkLevel = Math.floor((MAX_INTERVAL - blinkInterval) / 3) + 1;
+              speedLevel.textContent = `level ${Math.min(blinkLevel, 15)}`;
+            }
+            
+            // Random position
             gloveX = 0.15 + Math.random() * 0.7;
             gloveY = 0.15 + Math.random() * 0.7;
             const a = Math.random() * 2 * Math.PI;
@@ -606,14 +582,32 @@
             dirY = Math.sin(a);
             const l = Math.hypot(dirX, dirY);
             if (l > 0) { dirX /= l; dirY /= l; }
+          } else {
+            // Glove disappears - stop measuring
+            isMeasuringReaction = false;
           }
+          
+          blinkTimer = Math.floor(blinkInterval);
         }
 
+        // Check collision when glove is visible
         if (gloveVisible && dist < threshold) {
           if (hitCooldown <= 0) {
             punches++;
             punchCountEl.textContent = punches;
             hitCooldown = COOLDOWN_FRAMES;
+            
+            // Measure reaction time (time from appearance to hit)
+            if (isMeasuringReaction) {
+              const reactionTime = performance.now() - reactionStartTime;
+              lastReactionTime = reactionTime;
+              if (reactionTime < bestReaction) {
+                bestReaction = reactionTime;
+                reactionDisplay.textContent = `⏱️ best: ${Math.round(bestReaction)}ms`;
+              }
+              isMeasuringReaction = false;
+            }
+            
             if (dist > 0.001) {
               gloveX += (dx / dist) * 0.06;
               gloveY += (dy / dist) * 0.06;
@@ -626,11 +620,12 @@
           safe++;
           safeCountEl.textContent = safe;
         }
+        
         if (hitCooldown > 0) hitCooldown--;
         return;
       }
 
-      // Dodge mode
+      // DODGE mode
       gloveX += dirX * SPEED;
       gloveY += dirY * SPEED;
 
@@ -673,22 +668,12 @@
       if (hitCooldown > 0) hitCooldown--;
     }
 
-    // ----- render loop (optimized) -----
+    // ----- render loop -----
     function loop() {
       if (!isCameraReady) {
         drawOverlay();
         animationFrame = requestAnimationFrame(loop);
         return;
-      }
-
-      // FPS counter
-      frameCount++;
-      const now = performance.now();
-      if (now - lastFpsUpdate > 1000) {
-        currentFps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
-        fpsCounter.textContent = `⚡ ${currentFps} fps`;
-        frameCount = 0;
-        lastFpsUpdate = now;
       }
 
       updateGame();
@@ -700,7 +685,7 @@
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Draw face border FIRST (fast, uses cached landmarks)
+      // Draw face border (complete face outline only)
       drawFaceBorder();
 
       drawUser();
@@ -715,13 +700,21 @@
       ctx.textBaseline = 'top';
       ctx.fillText(currentMode.toUpperCase(), w - 20, 16);
       
-      // Show face detection status on canvas
       if (faceLandmarks) {
         ctx.font = '14px system-ui';
         ctx.fillStyle = 'rgba(0, 255, 200, 0.3)';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
         ctx.fillText('✓ face tracked', 16, h - 16);
+      }
+
+      // Show last reaction time in blink mode
+      if (currentMode === 'blink' && lastReactionTime > 0) {
+        ctx.font = 'bold 18px system-ui';
+        ctx.fillStyle = 'rgba(255, 216, 102, 0.8)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(`⚡ ${Math.round(lastReactionTime)}ms`, w/2, h - 16);
       }
     }
 
@@ -735,6 +728,7 @@
             modeStatus.textContent = currentMode;
             resetCounters();
             resetGlove();
+            resetBlinkSpeed();
           }
         });
         return;
@@ -744,6 +738,7 @@
       modeStatus.textContent = currentMode;
       resetCounters();
       resetGlove();
+      resetBlinkSpeed();
     }
 
     function resetGame() {
@@ -752,10 +747,12 @@
       modeStatus.textContent = '⏸';
       resetCounters();
       resetGlove();
+      resetBlinkSpeed();
       hitCooldown = 0;
       if (currentMode === 'blink') {
         gloveVisible = true;
-        blinkTimer = BLINK_INTERVAL;
+        blinkTimer = Math.floor(blinkInterval);
+        isMeasuringReaction = false;
       }
       drawOverlay();
     }
@@ -765,6 +762,18 @@
       safe = 0;
       punchCountEl.textContent = '0';
       safeCountEl.textContent = '0';
+      bestReaction = Infinity;
+      reactionDisplay.textContent = '⏱️ best: --ms';
+      lastReactionTime = 0;
+    }
+
+    function resetBlinkSpeed() {
+      blinkInterval = MAX_INTERVAL;
+      blinkLevel = 1;
+      speedLevel.textContent = 'level 1';
+      blinkTimer = Math.floor(blinkInterval);
+      gloveVisible = true;
+      isMeasuringReaction = false;
     }
 
     function resetGlove() {
@@ -777,7 +786,8 @@
       if (l > 0) { dirX /= l; dirY /= l; }
       if (currentMode === 'blink') {
         gloveVisible = true;
-        blinkTimer = BLINK_INTERVAL;
+        blinkTimer = Math.floor(blinkInterval);
+        isMeasuringReaction = false;
       }
     }
 
@@ -788,6 +798,7 @@
       });
       modeStatus.textContent = mode;
       resetGlove();
+      resetBlinkSpeed();
       hitCooldown = 0;
       if (!gameActive) drawOverlay();
     }
@@ -803,6 +814,7 @@
           setMode(mode);
           if (gameActive) {
             resetGlove();
+            resetBlinkSpeed();
             punchCountEl.textContent = punches;
             safeCountEl.textContent = safe;
           }
@@ -817,6 +829,7 @@
       resizeCanvas();
       startCamera().then(() => {
         resetGlove();
+        resetBlinkSpeed();
         drawOverlay();
         statusText.innerText = 'camera ready';
         modeStatus.textContent = 'press Start';
