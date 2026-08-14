@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Dodge Point · training box</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #0b0d15;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+      padding: 16px;
+    }
+    .card {
+      background: #1a1e2b;
+      border-radius: 40px;
+      padding: 24px 24px 32px;
+      max-width: 860px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+      transition: 0.2s;
+      border: 1px solid #3d4459;
+    }
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 500;
+      font-size: 1.8rem;
+      letter-spacing: -0.5px;
+      color: #eef2ff;
+      margin-bottom: 12px;
+      padding-left: 8px;
+    }
+    h1 span {
+      background: #2f3a4f;
+      padding: 0 14px;
+      border-radius: 100px;
+      font-size: 1rem;
+      font-weight: 400;
+      color: #b3c7ff;
+    }
+    .video-wrapper {
+      position: relative;
+      background: #10131f;
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px #313a4e, 0 12px 28px rgba(0,0,0,0.5);
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scaleX(-1); /* mirror effect */
+      background: #0e121f;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;  /* allow camera access click-through */
+    }
+    .controls {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 12px;
+    }
+    .status-badge {
+      background: #242b3d;
+      padding: 8px 18px;
+      border-radius: 60px;
+      color: #cbd5f0;
+      font-size: 0.95rem;
+      font-weight: 450;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #3b445c;
+      backdrop-filter: blur(2px);
+    }
+    .status-badge .dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 12px;
+      background: #53c47b;
+      transition: 0.2s;
+    }
+    .status-badge .dot.inactive {
+      background: #b34a5e;
+    }
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #2a3349;
+      border: none;
+      border-radius: 60px;
+      padding: 10px 24px;
+      font-weight: 500;
+      font-size: 1rem;
+      color: #eef2ff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: 0.15s;
+      border: 1px solid #414b66;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      letter-spacing: 0.3px;
+    }
+    .btn:active { transform: scale(0.94); }
+    .btn-primary {
+      background: #4f6bf5;
+      border-color: #7b93ff;
+      color: white;
+      box-shadow: 0 4px 12px #2f48b0;
+    }
+    .btn-primary:hover { background: #3f5be0; }
+    .btn-secondary { background: #303a52; }
+    .btn-secondary:hover { background: #3d4a66; }
+    .btn-warning {
+      background: #b95f3d;
+      border-color: #d97f5a;
+    }
+    .btn-warning:hover { background: #a14e30; }
+    .info-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-top: 18px;
+      padding: 0 6px;
+      color: #9baec9;
+      font-size: 0.9rem;
+      gap: 8px;
+    }
+    .info-row span {
+      background: #1b2131;
+      padding: 6px 16px;
+      border-radius: 30px;
+      border: 1px solid #2e374d;
+    }
+    .score {
+      color: #d6e2ff;
+      font-weight: 500;
+    }
+    @media (max-width: 560px) {
+      .card { padding: 16px; }
+      h1 { font-size: 1.4rem; }
+      .controls { flex-direction: column; align-items: stretch; }
+      .btn-group { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>
+    ⚡ DODGE POINT
+    <span>training</span>
+  </h1>
+
+  <div class="video-wrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlayCanvas"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="status-badge">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">camera off</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="startBtn">▶ Start</button>
+      <button class="btn btn-secondary" id="resetBtn">⟲ Reset</button>
+    </div>
+  </div>
+
+  <div class="info-row">
+    <span>🎯 <span id="pointStatus">waiting...</span></span>
+    <span class="score">🏆 <span id="scoreDisplay">0</span></span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ----- DOM elements -----
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('overlayCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const pointStatus = document.getElementById('pointStatus');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // ----- state -----
+    let stream = null;
+    let isCameraReady = false;
+    let animationFrame = null;
+    let gameActive = false;          // true when point is moving & scoring
+    let score = 0;
+
+    // point parameters (relative to canvas size)
+    let pointX = 0.5;      // 0..1
+    let pointY = 0.5;
+    const POINT_RADIUS = 0.045;      // relative to canvas width
+
+    // movement speed (relative units per frame)
+    const SPEED = 0.0065;
+
+    // direction vector (normalized)
+    let dirX = 0.6;
+    let dirY = 0.8;
+    // re-normalize
+    const len = Math.hypot(dirX, dirY);
+    if (len > 0) { dirX /= len; dirY /= len; } else { dirX = 0.7; dirY = 0.7; }
+
+    // collision flag (avoid spam)
+    let wasHit = false;
+    let hitCooldown = 0;          // frames to wait after hit before counting again
+
+    // resize canvas to match video-wrapper
+    function resizeCanvas() {
+      const wrapper = canvas.parentElement;
+      const rect = wrapper.getBoundingClientRect();
+      canvas.width = rect.width * devicePixelRatio;
+      canvas.height = rect.height * devicePixelRatio;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      // scale factor for drawing
+      ctx.scale(1, 1); 
+    }
+
+    // ----- camera start -----
+    async function startCamera() {
+      try {
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
+        }
+        const constraints = { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        await video.play();
+        isCameraReady = true;
+        statusDot.className = 'dot';
+        statusText.innerText = 'camera on';
+        resizeCanvas();
+        // if game not active, show point but not moving
+        if (!gameActive) {
+          drawOverlay(false);
+        } else {
+          // if game was active, continue
+        }
+        // start drawing loop if not already
+        if (!animationFrame) {
+          loop();
+        }
+      } catch (err) {
+        console.warn('camera error', err);
+        isCameraReady = false;
+        statusDot.className = 'dot inactive';
+        statusText.innerText = 'camera blocked';
+        alert('Please allow camera access and refresh.\nOr click "Start" again.');
+      }
+    }
+
+    // ----- main loop (animation) -----
+    function loop() {
+      if (!isCameraReady) {
+        // draw static placeholder
+        drawOverlay(false);
+        animationFrame = requestAnimationFrame(loop);
+        return;
+      }
+
+      // update point position if game active
+      if (gameActive) {
+        // move point
+        pointX += dirX * SPEED;
+        pointY += dirY * SPEED;
+
+        // bounce off edges
+        const margin = POINT_RADIUS * 1.2;
+        if (pointX < margin) { pointX = margin; dirX *= -1; }
+        if (pointX > 1 - margin) { pointX = 1 - margin; dirX *= -1; }
+        if (pointY < margin) { pointY = margin; dirY *= -1; }
+        if (pointY > 1 - margin) { pointY = 1 - margin; dirY *= -1; }
+
+        // optional random direction change (makes it less predictable)
+        if (Math.random() < 0.008) {
+          const angle = (Math.random() - 0.5) * 0.9;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          const newX = dirX * cos - dirY * sin;
+          const newY = dirX * sin + dirY * cos;
+          dirX = newX;
+          dirY = newY;
+          const l = Math.hypot(dirX, dirY);
+          if (l > 0) { dirX /= l; dirY /= l; }
+        }
+
+        // ----- collision detection with user (center of canvas) -----
+        // we consider "user" position as the center of the video (mirrored)
+        // because the user is expected to stand in the middle.
+        const userX = 0.5;
+        const userY = 0.5;
+        const dx = pointX - userX;
+        const dy = pointY - userY;
+        const distance = Math.hypot(dx, dy);
+        // collision radius: point radius + user radius (0.08 relative)
+        const userRadius = 0.085;
+        const threshold = POINT_RADIUS + userRadius;
+
+        if (distance < threshold) {
+          // hit! only if cooldown is 0
+          if (hitCooldown <= 0 && gameActive) {
+            // point touched user → decrease score
+            score = Math.max(0, score - 1);
+            scoreDisplay.innerText = score;
+            pointStatus.innerText = '💥 touched! -1';
+            hitCooldown = 25;   // 25 frames (~0.4s at 60fps)
+            wasHit = true;
+
+            // push point away from user to avoid stuck
+            if (distance > 0.001) {
+              const push = 0.04;
+              pointX += (dx / distance) * push;
+              pointY += (dy / distance) * push;
+              // clamp
+              pointX = Math.min(1 - POINT_RADIUS, Math.max(POINT_RADIUS, pointX));
+              pointY = Math.min(1 - POINT_RADIUS, Math.max(POINT_RADIUS, pointY));
+            }
+            // reverse direction for extra dodge
+            dirX *= -1.2; dirY *= -1.2;
+            const l = Math.hypot(dirX, dirY);
+            if (l > 0) { dirX /= l; dirY /= l; }
+          }
+        } else {
+          // not touching: increase score slowly (if game active)
+          if (hitCooldown <= 0 && gameActive) {
+            // if not recently hit, and distance > threshold + small margin
+            if (distance > threshold + 0.01) {
+              // reward for staying away
+              score += 0.03;
+              scoreDisplay.innerText = Math.floor(score);
+              if (pointStatus.innerText.includes('💥')) {
+                pointStatus.innerText = '✨ dodging';
+              } else {
+                pointStatus.innerText = '✨ safe';
+              }
+            } else {
+              pointStatus.innerText = '⚡ near!';
+            }
+          }
+          wasHit = false;
+        }
+
+        // cooldown decrement
+        if (hitCooldown > 0) {
+          hitCooldown--;
+          if (hitCooldown === 0) {
+            pointStatus.innerText = '⚡ dodge!';
+          }
+        }
+
+        // update score display (integer part)
+        scoreDisplay.innerText = Math.floor(score);
+      } else {
+        // game not active: point is static, show "paused"
+        pointStatus.innerText = '⏸ paused';
+      }
+
+      // draw everything
+      drawOverlay(gameActive);
+
+      // continue loop
+      animationFrame = requestAnimationFrame(loop);
+    }
+
+    // ----- draw overlay (point + circle + user indicator) -----
+    function drawOverlay(active) {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // draw semi-transparent user circle (center)
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const userRadiusPx = Math.min(w, h) * 0.085;
+
+      // glow / guide ring
+      ctx.beginPath();
+      ctx.arc(cx, cy, userRadiusPx + 4, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(180, 200, 255, 0.25)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, userRadiusPx, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(80, 140, 255, 0.15)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(150, 200, 255, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // draw the moving point
+      const px = w * pointX;
+      const py = h * pointY;
+      const radius = Math.min(w, h) * POINT_RADIUS;
+
+      // outer glow
+      const gradient = ctx.createRadialGradient(px, py, radius * 0.2, px, py, radius * 2.2);
+      gradient.addColorStop(0, active ? '#ffb347' : '#7f8fa6');
+      gradient.addColorStop(0.6, active ? '#e0662e' : '#4a5568');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(px, py, radius * 2.2, 0, 2 * Math.PI);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // main point
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = active ? '#ff7e2e' : '#6a7a92';
+      ctx.shadowColor = active ? '#ffaa55' : '#33435a';
+      ctx.shadowBlur = 25;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = active ? '#ffcc77' : '#99aac2';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // inner highlight
+      ctx.beginPath();
+      ctx.arc(px - radius * 0.2, py - radius * 0.2, radius * 0.25, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(255,255,245,0.5)';
+      ctx.fill();
+
+      // "x" mark (dodge target)
+      ctx.font = `${Math.min(w, h) * 0.035}px monospace`;
+      ctx.fillStyle = 'rgba(255,255,230,0.7)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✕', px, py - radius * 0.2);
+
+      // display hit cooldown indicator
+      if (hitCooldown > 0) {
+        ctx.font = `bold ${Math.min(w,h) * 0.04}px system-ui`;
+        ctx.fillStyle = '#ffb0a0';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff3a2a';
+        ctx.fillText('⚡', px + radius * 1.6, py - radius * 1.2);
+        ctx.shadowBlur = 0;
+      }
+
+      // show "you are here" label
+      ctx.font = `${Math.min(w,h) * 0.028}px system-ui`;
+      ctx.fillStyle = 'rgba(220, 235, 255, 0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText('⏺ you', cx, cy + userRadiusPx + 20);
+    }
+
+    // ----- game controls -----
+    function startGame() {
+      if (!isCameraReady) {
+        startCamera().then(() => {
+          // after camera start, activate game
+          if (isCameraReady) {
+            gameActive = true;
+            pointStatus.innerText = '⚡ dodge!';
+            statusDot.className = 'dot';
+            statusText.innerText = 'camera on';
+            resetPointPosition();
+            // reset score
+            score = 0;
+            scoreDisplay.innerText = '0';
+            hitCooldown = 0;
+          }
+        });
+        return;
+      }
+      // camera already ready
+      gameActive = true;
+      pointStatus.innerText = '⚡ dodge!';
+      resetPointPosition();
+      score = 0;
+      scoreDisplay.innerText = '0';
+      hitCooldown = 0;
+      statusDot.className = 'dot';
+      statusText.innerText = 'game on';
+    }
+
+    function resetGame() {
+      gameActive = false;
+      score = 0;
+      scoreDisplay.innerText = '0';
+      pointStatus.innerText = '⏸ reset';
+      hitCooldown = 0;
+      resetPointPosition();
+      // keep camera on but game paused
+      if (isCameraReady) {
+        statusDot.className = 'dot';
+        statusText.innerText = 'camera on';
+      } else {
+        statusDot.className = 'dot inactive';
+        statusText.innerText = 'camera off';
+      }
+      drawOverlay(false);
+    }
+
+    function resetPointPosition() {
+      pointX = 0.3 + Math.random() * 0.4;
+      pointY = 0.3 + Math.random() * 0.4;
+      // random direction
+      let angle = Math.random() * 2 * Math.PI;
+      dirX = Math.cos(angle);
+      dirY = Math.sin(angle);
+      const l = Math.hypot(dirX, dirY);
+      if (l > 0) { dirX /= l; dirY /= l; }
+    }
+
+    // ----- event listeners -----
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+
+    // resize observer
+    const resizeObserver = new ResizeObserver(() => {
+      resizeCanvas();
+    });
+    resizeObserver.observe(canvas.parentElement);
+
+    // initialization: try camera on load
+    window.addEventListener('load', () => {
+      resizeCanvas();
+      // auto-start camera (user gesture may be required, but we call it)
+      startCamera().then(() => {
+        // set initial point
+        resetPointPosition();
+        drawOverlay(false);
+        statusText.innerText = 'camera ready';
+        pointStatus.innerText = 'press Start';
+      });
+    });
+
+    // cleanup
+    window.addEventListener('beforeunload', () => {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+    });
+
+  })();
+</script>
+</body>
+</html>
