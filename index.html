@@ -3,13 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Boxing trainer · glove dodge</title>
+  <title>Boxing trainer · face border</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #0b0d15;
       min-height: 100vh;
@@ -23,7 +19,7 @@
       background: #1a1e2b;
       border-radius: 40px;
       padding: 24px 24px 28px;
-      max-width: 880px;
+      max-width: 920px;
       width: 100%;
       box-shadow: 0 20px 40px rgba(0,0,0,0.7);
       border: 1px solid #3d4459;
@@ -41,7 +37,7 @@
       flex-wrap: wrap;
     }
     h1 small {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       background: #2f3a4f;
       padding: 0 16px;
       border-radius: 60px;
@@ -136,11 +132,6 @@
     .btn-primary:hover { background: #3f5be0; }
     .btn-secondary { background: #303a52; }
     .btn-secondary:hover { background: #3d4a66; }
-    .btn-warning {
-      background: #b95f3d;
-      border-color: #d97f5a;
-    }
-    .btn-warning:hover { background: #a14e30; }
     .mode-selector {
       display: flex;
       gap: 6px;
@@ -190,9 +181,17 @@
       font-weight: 600;
       min-width: 24px;
     }
+    .face-status {
+      color: #8af;
+      font-size: 0.8rem;
+      background: #1a2335;
+      padding: 2px 12px;
+      border-radius: 30px;
+      border: 1px solid #3d4f72;
+    }
     @media (max-width: 600px) {
       .card { padding: 16px; }
-      h1 { font-size: 1.4rem; }
+      h1 { font-size: 1.3rem; }
       .controls { flex-direction: column; align-items: stretch; }
       .btn-group { justify-content: center; }
       .mode-selector { justify-content: center; }
@@ -203,7 +202,7 @@
 <div class="card">
   <h1>
     🥊 BOXING TRAINER
-    <small>glove dodge</small>
+    <small>face border</small>
   </h1>
 
   <div class="video-wrapper">
@@ -215,6 +214,7 @@
     <div class="status-badge">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">camera off</span>
+      <span class="face-status" id="faceStatus">👤 detecting...</span>
     </div>
     <div class="mode-selector" id="modeSelector">
       <button class="mode-btn active" data-mode="dodge">🏃 Dodge</button>
@@ -242,6 +242,7 @@
 
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
+    const faceStatus = document.getElementById('faceStatus');
     const modeStatus = document.getElementById('modeStatus');
     const punchCountEl = document.getElementById('punchCount');
     const safeCountEl = document.getElementById('safeCount');
@@ -257,28 +258,95 @@
     let gameActive = false;
 
     // counters
-    let punches = 0;      // times glove touched you
-    let safe = 0;         // successful dodges (distance based)
+    let punches = 0;
+    let safe = 0;
 
-    // glove (point) state
+    // glove (point)
     let gloveX = 0.5, gloveY = 0.5;
-    const GLOVE_RADIUS = 0.055;   // relative to width
+    const GLOVE_RADIUS = 0.055;
 
-    // movement
     let dirX = 0.7, dirY = 0.5;
     const SPEED = 0.007;
 
     // blink mode
     let blinkTimer = 0;
-    const BLINK_INTERVAL = 40;    // frames
+    const BLINK_INTERVAL = 40;
     let gloveVisible = true;
 
-    // mode: 'dodge' or 'blink'
     let currentMode = 'dodge';
-
-    // collision cooldown
     let hitCooldown = 0;
     const COOLDOWN_FRAMES = 20;
+
+    // ----- Face detection (using MediaPipe FaceMesh via CDN) -----
+    let faceDetector = null;
+    let faceMesh = null;
+    let faceLandmarks = null;
+    let faceDetectionReady = false;
+    let faceDetectionAttempted = false;
+
+    // Load MediaPipe FaceMesh
+    async function loadFaceDetection() {
+      if (faceDetectionAttempted) return;
+      faceDetectionAttempted = true;
+      try {
+        // Dynamically load MediaPipe libraries
+        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js');
+        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js');
+
+        faceMesh = new FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+
+        faceMesh.onResults((results) => {
+          if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+            faceLandmarks = results.multiFaceLandmarks[0];
+            faceStatus.textContent = '👤 face detected';
+            faceStatus.style.color = '#8af';
+          } else {
+            faceLandmarks = null;
+            faceStatus.textContent = '👤 no face';
+            faceStatus.style.color = '#a88';
+          }
+        });
+
+        // Start face detection
+        const camera = new Camera(video, {
+          onFrame: async () => {
+            if (faceMesh) {
+              await faceMesh.send({ image: video });
+            }
+          },
+          width: 640,
+          height: 480
+        });
+        await camera.start();
+        faceDetectionReady = true;
+        console.log('Face detection ready');
+      } catch (err) {
+        console.warn('Face detection not available:', err);
+        faceStatus.textContent = '⚠️ face detection unavailable';
+        faceDetectionReady = false;
+      }
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
 
     // ----- canvas resize -----
     function resizeCanvas() {
@@ -306,24 +374,88 @@
         statusDot.className = 'dot';
         statusText.innerText = 'camera on';
         resizeCanvas();
+
+        // Load face detection after camera is ready
+        if (!faceDetectionAttempted) {
+          await loadFaceDetection();
+        }
+
         if (!animationFrame) loop();
       } catch (err) {
         console.warn('camera error', err);
         isCameraReady = false;
         statusDot.className = 'dot inactive';
         statusText.innerText = 'camera blocked';
-        alert('Please allow camera access and refresh.\nOr click "Start" again.');
+        alert('Please allow camera access.');
       }
     }
 
-    // ----- draw boxing glove (emojis + shapes) -----
+    // ----- draw face border (from landmarks) -----
+    function drawFaceBorder() {
+      if (!faceLandmarks || !faceDetectionReady) return;
+
+      const w = canvas.width, h = canvas.height;
+      // Get key points: outline of face (indices 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109)
+      const indices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+      
+      ctx.beginPath();
+      let first = true;
+      for (const idx of indices) {
+        const lm = faceLandmarks[idx];
+        if (!lm) continue;
+        const x = lm.x * w;
+        const y = lm.y * h;
+        if (first) {
+          ctx.moveTo(x, y);
+          first = false;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#00ffcc';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = '#00ffcc';
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Draw additional key points (eyes, nose, mouth) for better visualization
+      const features = [
+        { idx: 1, color: '#ffaa55', label: '👁' },  // right eye
+        { idx: 33, color: '#ffaa55', label: '👁' }, // left eye
+        { idx: 0, color: '#ff6b6b', label: '👃' },  // nose
+        { idx: 13, color: '#ff6b6b', label: '👄' }, // mouth
+        { idx: 14, color: '#ff6b6b', label: '👄' }  // mouth
+      ];
+      for (const f of features) {
+        const lm = faceLandmarks[f.idx];
+        if (!lm) continue;
+        const x = lm.x * w;
+        const y = lm.y * h;
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = f.color;
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = 'white';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.fillText(f.label, x + 12, y - 8);
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    // ----- draw boxing glove -----
     function drawGlove(x, y, radius, visible, isHit) {
       const w = canvas.width, h = canvas.height;
       const px = x * w, py = y * h;
       const r = Math.min(w, h) * radius;
 
       if (!visible) {
-        // draw ghost outline
         ctx.beginPath();
         ctx.arc(px, py, r * 0.9, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(150,150,180,0.25)';
@@ -334,7 +466,6 @@
         return;
       }
 
-      // glow
       const grad = ctx.createRadialGradient(px, py, r * 0.2, px, py, r * 2.5);
       const color = isHit ? '#ff5544' : (currentMode === 'blink' ? '#ffbb44' : '#ff7e2e');
       grad.addColorStop(0, isHit ? '#ff6644' : (currentMode === 'blink' ? '#ffcc55' : '#ff8a3a'));
@@ -345,43 +476,34 @@
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // main glove (boxing glove shape using emoji + circle)
       ctx.shadowColor = isHit ? '#ff4422' : '#ffaa44';
       ctx.shadowBlur = 30;
-
-      // draw a boxing glove emoji as base
       ctx.font = `${r * 2.2}px "Segoe UI Emoji", "Apple Color Emoji", system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 25;
       ctx.fillStyle = isHit ? '#ff4433' : (currentMode === 'blink' ? '#f5b342' : '#e6732e');
       ctx.fillText('🥊', px, py - r * 0.1);
 
-      // additional circle to make it more "glove like"
       ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(px + r * 0.2, py - r * 0.15, r * 0.45, 0, 2 * Math.PI);
       ctx.fillStyle = isHit ? '#dd3322' : (currentMode === 'blink' ? '#dba23a' : '#cc6622');
       ctx.fill();
 
-      // highlight
       ctx.shadowBlur = 0;
       ctx.beginPath();
       ctx.arc(px - r * 0.25, py - r * 0.35, r * 0.15, 0, 2 * Math.PI);
       ctx.fillStyle = 'rgba(255,255,240,0.4)';
       ctx.fill();
 
-      // "X" marks the spot
       ctx.font = `bold ${r * 0.8}px monospace`;
       ctx.fillStyle = 'rgba(255,255,220,0.7)';
       ctx.shadowBlur = 0;
       ctx.fillText('✕', px + r * 0.1, py - r * 0.1);
-
-      // reset shadow
       ctx.shadowBlur = 0;
     }
 
-    // ----- draw user indicator -----
+    // ----- draw user indicator (center) -----
     function drawUser() {
       const w = canvas.width, h = canvas.height;
       const cx = w * 0.5, cy = h * 0.5;
@@ -417,17 +539,14 @@
       const dist = Math.hypot(dx, dy);
       const threshold = GLOVE_RADIUS + 0.085;
 
-      // ----- BLINK mode -----
       if (currentMode === 'blink') {
         blinkTimer--;
         if (blinkTimer <= 0) {
           gloveVisible = !gloveVisible;
           blinkTimer = BLINK_INTERVAL;
-          // when glove appears, it may appear at random position
           if (gloveVisible) {
             gloveX = 0.15 + Math.random() * 0.7;
             gloveY = 0.15 + Math.random() * 0.7;
-            // random direction
             const a = Math.random() * 2 * Math.PI;
             dirX = Math.cos(a);
             dirY = Math.sin(a);
@@ -436,34 +555,28 @@
           }
         }
 
-        // collision only when visible
         if (gloveVisible && dist < threshold) {
           if (hitCooldown <= 0) {
             punches++;
             punchCountEl.textContent = punches;
             hitCooldown = COOLDOWN_FRAMES;
-            // push glove away
             if (dist > 0.001) {
               gloveX += (dx / dist) * 0.06;
               gloveY += (dy / dist) * 0.06;
             }
-            // reverse direction
             dirX *= -1.2; dirY *= -1.2;
             const l = Math.hypot(dirX, dirY);
             if (l > 0) { dirX /= l; dirY /= l; }
           }
         } else if (gloveVisible && dist > threshold + 0.02 && hitCooldown <= 0) {
-          // safe dodge: glove is visible and far enough
           safe++;
           safeCountEl.textContent = safe;
         }
-        // cooldown
         if (hitCooldown > 0) hitCooldown--;
         return;
       }
 
-      // ----- DODGE mode (moving) -----
-      // move glove
+      // Dodge mode
       gloveX += dirX * SPEED;
       gloveY += dirY * SPEED;
 
@@ -473,7 +586,6 @@
       if (gloveY < margin) { gloveY = margin; dirY *= -1; }
       if (gloveY > 1 - margin) { gloveY = 1 - margin; dirY *= -1; }
 
-      // random direction change
       if (Math.random() < 0.01) {
         const ang = (Math.random() - 0.5) * 0.8;
         const c = Math.cos(ang), s = Math.sin(ang);
@@ -484,7 +596,6 @@
         if (l > 0) { dirX /= l; dirY /= l; }
       }
 
-      // collision
       if (dist < threshold) {
         if (hitCooldown <= 0) {
           punches++;
@@ -525,23 +636,23 @@
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // draw user
+      // Draw face border FIRST (behind everything)
+      drawFaceBorder();
+
       drawUser();
 
-      // draw glove (boxing glove)
       const isHit = hitCooldown > 0;
       const visible = (currentMode === 'blink') ? gloveVisible : true;
       drawGlove(gloveX, gloveY, GLOVE_RADIUS, visible, isHit);
 
-      // mode label
       ctx.font = `bold ${Math.min(w,h) * 0.035}px system-ui`;
-      ctx.fillStyle = 'rgba(200,215,255,0.25)';
+      ctx.fillStyle = 'rgba(200,215,255,0.2)';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
       ctx.fillText(currentMode.toUpperCase(), w - 20, 16);
     }
 
-    // ----- game controls -----
+    // ----- controls -----
     function startGame() {
       if (!isCameraReady) {
         startCamera().then(() => {
@@ -597,7 +708,6 @@
       }
     }
 
-    // ----- mode switch -----
     function setMode(mode) {
       currentMode = mode;
       modeBtns.forEach(btn => {
@@ -606,9 +716,7 @@
       modeStatus.textContent = mode;
       resetGlove();
       hitCooldown = 0;
-      if (!gameActive) {
-        drawOverlay();
-      }
+      if (!gameActive) drawOverlay();
     }
 
     // ----- event listeners -----
@@ -621,8 +729,6 @@
         if (mode !== currentMode) {
           setMode(mode);
           if (gameActive) {
-            // reset counters when switching mode?
-            // we keep them, but glove resets
             resetGlove();
             punchCountEl.textContent = punches;
             safeCountEl.textContent = safe;
@@ -631,11 +737,9 @@
       });
     });
 
-    // resize
     const ro = new ResizeObserver(() => resizeCanvas());
     ro.observe(canvas.parentElement);
 
-    // init
     window.addEventListener('load', () => {
       resizeCanvas();
       startCamera().then(() => {
